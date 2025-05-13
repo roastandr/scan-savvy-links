@@ -10,7 +10,7 @@ import { ScanChart, ScanData } from "@/components/analytics/scan-chart";
 import { LocationChart } from "@/components/analytics/location-chart";
 import { DeviceChart } from "@/components/analytics/device-chart";
 import { formatDate } from "@/lib/utils";
-import QRCodeReact from "qrcode.react";
+import { QRCodeCanvas } from "qrcode.react";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 
@@ -297,7 +297,7 @@ export default function QRCodeDetail() {
 
                 <div className="flex justify-center items-center">
                   <div className="p-4 bg-white rounded-xl shadow-lg">
-                    <QRCodeReact
+                    <QRCodeCanvas
                       id="qr-code"
                       value={qrCode.targetUrl}
                       size={180}
@@ -305,7 +305,6 @@ export default function QRCodeDetail() {
                       bgColor="#FFFFFF"
                       level="H"
                       includeMargin
-                      renderAs="canvas"
                     />
                   </div>
                 </div>

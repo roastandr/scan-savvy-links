@@ -1,6 +1,5 @@
-
 import { useState } from "react";
-import QRCodeReact from "qrcode.react";
+import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
@@ -181,14 +180,13 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
       
       <div className="flex flex-col items-center justify-center">
         <div className="p-4 rounded-xl bg-white shadow-lg">
-          <QRCodeReact
+          <QRCodeSVG
             value={targetUrl || "https://qrtrakr.com"}
             size={280}
             fgColor={fgColor}
             bgColor={bgColor}
             level="H"
             includeMargin
-            renderAs="svg"
           />
         </div>
         <div className="mt-4 text-center space-y-1">
