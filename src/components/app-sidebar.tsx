@@ -11,7 +11,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuLink,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
@@ -82,14 +81,15 @@ export function AppSidebar() {
         <SidebarMenu>
           {mainMenu.map((item) => (
             <SidebarMenuItem key={item.title}>
-              <SidebarMenuLink
-                as={Link}
-                to={item.path}
-                active={isActive(item.path)}
+              <SidebarMenuButton
+                asChild
+                isActive={isActive(item.path)}
               >
-                <item.icon className="h-4 w-4" />
-                <span>{item.title}</span>
-              </SidebarMenuLink>
+                <Link to={item.path}>
+                  <item.icon className="h-4 w-4" />
+                  <span>{item.title}</span>
+                </Link>
+              </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
         </SidebarMenu>
@@ -97,14 +97,15 @@ export function AppSidebar() {
         <SidebarMenu className="mt-6">
           {secondaryMenu.map((item) => (
             <SidebarMenuItem key={item.title}>
-              <SidebarMenuLink
-                as={Link}
-                to={item.path}
-                active={isActive(item.path)}
+              <SidebarMenuButton
+                asChild
+                isActive={isActive(item.path)}
               >
-                <item.icon className="h-4 w-4" />
-                <span>{item.title}</span>
-              </SidebarMenuLink>
+                <Link to={item.path}>
+                  <item.icon className="h-4 w-4" />
+                  <span>{item.title}</span>
+                </Link>
+              </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
         </SidebarMenu>
