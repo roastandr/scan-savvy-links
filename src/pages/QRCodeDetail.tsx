@@ -11,7 +11,7 @@ import { ScanChart, ScanData } from "@/components/analytics/scan-chart";
 import { LocationChart } from "@/components/analytics/location-chart";
 import { DeviceChart } from "@/components/analytics/device-chart";
 import { formatDate } from "@/lib/utils";
-import QRCode from "qrcode.react";
+import { QRCode } from "qrcode.react";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 

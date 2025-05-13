@@ -1,6 +1,13 @@
 
 import { Link, useLocation } from "react-router-dom";
-import { BarChart, Home, PlusCircle, QrCode, Settings, User } from "lucide-react";
+import { 
+  BarChart, 
+  Home, 
+  PlusCircle, 
+  QrCode, 
+  Settings, 
+  User 
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
 import {
@@ -19,7 +26,7 @@ import { ModeToggle } from "@/components/mode-toggle";
 interface MenuItem {
   title: string;
   path: string;
-  icon: React.ComponentType<{ className?: string; size?: number }>;
+  icon: React.ElementType;
 }
 
 const mainMenu: MenuItem[] = [

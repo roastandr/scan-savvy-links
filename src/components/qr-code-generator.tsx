@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import QRCode from "qrcode.react";
+import { QRCode } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
