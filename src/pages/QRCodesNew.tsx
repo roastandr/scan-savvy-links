@@ -4,13 +4,16 @@ import { useNavigate } from "react-router-dom";
 import { QRCodeGenerator } from "@/components/qr-code-generator";
 import { useToast } from "@/hooks/use-toast";
 import { generateShortCode } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function QRCodesNew() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  const handleSaveQRCode = (qrCodeData: {
+  const handleSaveQRCode = async (qrCodeData: {
     name: string;
     targetUrl: string;
     shortCode: string;
@@ -18,25 +21,46 @@ export default function QRCodesNew() {
     fgColor: string;
     bgColor: string;
   }) => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "You must be logged in to create QR codes",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsLoading(true);
 
     try {
-      // This is a placeholder - actual saving will be implemented with Supabase
-      console.log("Saving QR code:", qrCodeData);
+      // Save QR code to database
+      const { data, error } = await supabase
+        .from('qr_links')
+        .insert({
+          name: qrCodeData.name,
+          target_url: qrCodeData.targetUrl,
+          slug: qrCodeData.shortCode,
+          expires_at: qrCodeData.expiresAt,
+          color: qrCodeData.fgColor,
+          background_color: qrCodeData.bgColor,
+          user_id: user.id,
+        })
+        .select('id')
+        .single();
       
-      // Simulate saving success for demo purposes
-      setTimeout(() => {
-        toast({
-          title: "QR Code Created",
-          description: "Your QR code has been created successfully.",
-        });
-        navigate("/qr-codes");
-      }, 1500);
-    } catch (error) {
+      if (error) throw error;
+      
+      toast({
+        title: "QR Code Created",
+        description: "Your QR code has been created successfully.",
+      });
+      
+      navigate("/qr-codes");
+    } catch (error: any) {
       console.error("Error saving QR code:", error);
       toast({
         title: "Failed to Create QR Code",
-        description: "There was an error creating your QR code. Please try again.",
+        description: error.message || "There was an error creating your QR code. Please try again.",
         variant: "destructive",
       });
     } finally {

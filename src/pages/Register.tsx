@@ -1,42 +1,31 @@
 
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { AuthForm } from "@/components/auth-form";
 import { Logo } from "@/components/logo";
 import { ModeToggle } from "@/components/mode-toggle";
-import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Register() {
   const [isLoading, setIsLoading] = useState(false);
-  const navigate = useNavigate();
-  const { toast } = useToast();
+  const { signUp, isAuthenticated } = useAuth();
 
   const handleRegister = async (email: string, password: string) => {
     setIsLoading(true);
     
     try {
-      // This is a placeholder - actual registration will be implemented with Supabase
-      console.log("Registering with:", email, password);
-      
-      // Simulate registration success for demo purposes
-      setTimeout(() => {
-        toast({
-          title: "Registration Successful",
-          description: "Your account has been created. Welcome to QRTrakr!",
-        });
-        navigate("/dashboard");
-      }, 1500);
+      await signUp(email, password);
     } catch (error) {
       console.error("Registration error:", error);
-      toast({
-        title: "Registration Failed",
-        description: "There was an error creating your account. Please try again.",
-        variant: "destructive",
-      });
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Redirect if already authenticated
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return (
     <div className="flex min-h-screen flex-col">

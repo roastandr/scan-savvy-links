@@ -1,42 +1,31 @@
 
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { AuthForm } from "@/components/auth-form";
 import { Logo } from "@/components/logo";
 import { ModeToggle } from "@/components/mode-toggle";
-import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
-  const navigate = useNavigate();
-  const { toast } = useToast();
+  const { signIn, isAuthenticated } = useAuth();
 
   const handleLogin = async (email: string, password: string) => {
     setIsLoading(true);
     
     try {
-      // This is a placeholder - actual login will be implemented with Supabase
-      console.log("Logging in with:", email, password);
-      
-      // Simulate login success for demo purposes
-      setTimeout(() => {
-        toast({
-          title: "Login Successful",
-          description: "Welcome back to QRTrakr!",
-        });
-        navigate("/dashboard");
-      }, 1500);
+      await signIn(email, password);
     } catch (error) {
       console.error("Login error:", error);
-      toast({
-        title: "Login Failed",
-        description: "Please check your credentials and try again.",
-        variant: "destructive",
-      });
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Redirect if already authenticated
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return (
     <div className="flex min-h-screen flex-col">

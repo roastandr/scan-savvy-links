@@ -1,8 +1,8 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,8 +10,9 @@ import { DatePicker } from "@/components/date-picker";
 import { Card, CardContent } from "@/components/ui/card";
 import { HexColorPicker } from "react-colorful";
 import { generateShortCode } from "@/lib/utils";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Copy } from "lucide-react";
 import { format } from "date-fns";
+import { toast } from "@/components/ui/use-toast";
 
 type QRCodeGeneratorProps = {
   onSave: (qrCodeData: {
@@ -33,6 +34,13 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
   const [fgColor, setFgColor] = useState("#7828f8");
   const [bgColor, setBgColor] = useState("#ffffff");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [trackingUrl, setTrackingUrl] = useState("");
+  
+  // Generate the tracking URL whenever the shortCode changes
+  useEffect(() => {
+    const origin = window.location.origin;
+    setTrackingUrl(`${origin}/r/${shortCode}`);
+  }, [shortCode]);
   
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -73,6 +81,14 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
   const generateNewCode = () => {
     setShortCode(generateShortCode());
   };
+  
+  const copyTrackingUrl = () => {
+    navigator.clipboard.writeText(trackingUrl);
+    toast({
+      title: "URL copied to clipboard",
+      description: "The tracking URL has been copied to your clipboard.",
+    });
+  };
 
   return (
     <div className="grid md:grid-cols-2 gap-8">
@@ -94,7 +110,7 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
               onChange={(e) => setName(e.target.value)}
               className={errors.name ? "border-destructive" : ""}
             />
-            {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
+            {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
           </div>
           
           <div className="space-y-2">
@@ -106,7 +122,7 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
               onChange={(e) => setTargetUrl(e.target.value)}
               className={errors.targetUrl ? "border-destructive" : ""}
             />
-            {errors.targetUrl && <p className="text-sm text-destructive">{errors.targetUrl}</p>}
+            {errors.targetUrl && <p className="text-xs text-destructive">{errors.targetUrl}</p>}
           </div>
           
           <div className="space-y-2">
@@ -127,9 +143,29 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
                 Refresh
               </Button>
             </div>
-            {errors.shortCode && <p className="text-sm text-destructive">{errors.shortCode}</p>}
+            {errors.shortCode && <p className="text-xs text-destructive">{errors.shortCode}</p>}
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="trackingUrl">Tracking URL</Label>
+            <div className="flex gap-2">
+              <Input
+                id="trackingUrl"
+                value={trackingUrl}
+                readOnly
+                className="bg-muted"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={copyTrackingUrl}
+                title="Copy to clipboard"
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
             <p className="text-xs text-muted-foreground">
-              This will be used to create your short URL: domain.com/r/{shortCode}
+              This is the URL that will be encoded in your QR code. When scanned, we'll track the visit and redirect to your target URL.
             </p>
           </div>
           
@@ -181,7 +217,7 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
       <div className="flex flex-col items-center justify-center">
         <div className="p-4 rounded-xl bg-white shadow-lg">
           <QRCodeSVG
-            value={targetUrl || "https://qrtrakr.com"}
+            value={trackingUrl || "https://qrtrakr.com"}
             size={280}
             fgColor={fgColor}
             bgColor={bgColor}

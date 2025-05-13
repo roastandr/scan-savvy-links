@@ -3,75 +3,88 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, Search } from "lucide-react";
+import { PlusCircle, Search, Loader2 } from "lucide-react";
 import { QRCard, QRCodeData } from "@/components/qr-card";
 import { useToast } from "@/hooks/use-toast";
-
-// Mock data
-const mockQRCodes: QRCodeData[] = [
-  {
-    id: "1",
-    name: "Website QR",
-    shortCode: "web123",
-    targetUrl: "https://example.com",
-    createdAt: "2025-05-01",
-    expiresAt: null,
-    active: true,
-    scanCount: 245,
-    color: "#7828f8",
-  },
-  {
-    id: "2",
-    name: "Product Page",
-    shortCode: "prod456",
-    targetUrl: "https://example.com/product",
-    createdAt: "2025-05-05",
-    expiresAt: "2025-08-01",
-    active: true,
-    scanCount: 112,
-    color: "#8347ff",
-  },
-  {
-    id: "3",
-    name: "Event Registration",
-    shortCode: "event789",
-    targetUrl: "https://example.com/event",
-    createdAt: "2025-05-08",
-    expiresAt: "2025-06-15",
-    active: false,
-    scanCount: 89,
-    color: "#9f75ff",
-  },
-  {
-    id: "4",
-    name: "Special Offer",
-    shortCode: "offer123",
-    targetUrl: "https://example.com/offer",
-    createdAt: "2025-05-10",
-    expiresAt: "2025-07-15",
-    active: true,
-    scanCount: 76,
-    color: "#7828f8",
-  },
-  {
-    id: "5",
-    name: "Contact Page",
-    shortCode: "contact45",
-    targetUrl: "https://example.com/contact",
-    createdAt: "2025-05-12",
-    expiresAt: null,
-    active: true,
-    scanCount: 34,
-    color: "#8347ff",
-  },
-];
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function QRCodes() {
-  const [qrCodes, setQrCodes] = useState<QRCodeData[]>(mockQRCodes);
+  const [qrCodes, setQrCodes] = useState<QRCodeData[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filteredQRCodes, setFilteredQRCodes] = useState<QRCodeData[]>(mockQRCodes);
+  const [filteredQRCodes, setFilteredQRCodes] = useState<QRCodeData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const { user } = useAuth();
 
+  // Fetch QR codes from database
+  useEffect(() => {
+    const fetchQRCodes = async () => {
+      if (!user) return;
+      
+      try {
+        setIsLoading(true);
+        const { data, error } = await supabase
+          .from('qr_links')
+          .select(`
+            id, 
+            name, 
+            slug, 
+            target_url, 
+            created_at, 
+            expires_at, 
+            is_active, 
+            color
+          `)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        // Also fetch scan counts for each QR code
+        const qrCodesWithScans = await Promise.all(
+          (data || []).map(async (qrCode) => {
+            const { count, error: scanError } = await supabase
+              .from('scans')
+              .select('id', { count: 'exact', head: true })
+              .eq('qr_link_id', qrCode.id);
+            
+            if (scanError) {
+              console.error("Error fetching scan count:", scanError);
+              return {
+                ...qrCode,
+                scanCount: 0,
+              };
+            }
+            
+            return {
+              ...qrCode,
+              scanCount: count || 0,
+              shortCode: qrCode.slug,
+              createdAt: qrCode.created_at,
+              expiresAt: qrCode.expires_at,
+              active: qrCode.is_active,
+            };
+          })
+        );
+        
+        setQrCodes(qrCodesWithScans);
+      } catch (error) {
+        console.error("Error fetching QR codes:", error);
+        toast({
+          title: "Failed to load QR codes",
+          description: "There was an error loading your QR codes. Please try refreshing.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchQRCodes();
+  }, [user, toast]);
+
+  // Filter QR codes based on search query
   useEffect(() => {
     const filtered = qrCodes.filter(
       (qr) =>
@@ -82,22 +95,54 @@ export default function QRCodes() {
     setFilteredQRCodes(filtered);
   }, [searchQuery, qrCodes]);
 
-  const handleDeleteQRCode = (id: string) => {
-    setQrCodes(qrCodes.filter((qr) => qr.id !== id));
-    toast({
-      title: "QR Code deleted",
-      description: "The QR code has been deleted successfully.",
-    });
+  const handleDeleteQRCode = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('qr_links')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      setQrCodes(qrCodes.filter((qr) => qr.id !== id));
+      toast({
+        title: "QR Code deleted",
+        description: "The QR code has been deleted successfully.",
+      });
+    } catch (error: any) {
+      console.error("Error deleting QR code:", error);
+      toast({
+        title: "Failed to delete QR code",
+        description: error.message || "There was an error deleting the QR code.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleToggleActive = (id: string, active: boolean) => {
-    setQrCodes(
-      qrCodes.map((qr) => (qr.id === id ? { ...qr, active } : qr))
-    );
-    toast({
-      title: active ? "QR Code activated" : "QR Code deactivated",
-      description: `The QR code has been ${active ? "activated" : "deactivated"} successfully.`,
-    });
+  const handleToggleActive = async (id: string, active: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('qr_links')
+        .update({ is_active: active })
+        .eq('id', id);
+      
+      if (error) throw error;
+      
+      setQrCodes(
+        qrCodes.map((qr) => (qr.id === id ? { ...qr, active } : qr))
+      );
+      toast({
+        title: active ? "QR Code activated" : "QR Code deactivated",
+        description: `The QR code has been ${active ? "activated" : "deactivated"} successfully.`,
+      });
+    } catch (error: any) {
+      console.error("Error updating QR code:", error);
+      toast({
+        title: "Failed to update QR code",
+        description: error.message || "There was an error updating the QR code status.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -127,10 +172,13 @@ export default function QRCodes() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <div></div>
       </div>
 
-      {filteredQRCodes.length > 0 ? (
+      {isLoading ? (
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : filteredQRCodes.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredQRCodes.map((qr) => (
             <QRCard

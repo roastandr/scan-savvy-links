@@ -6,7 +6,9 @@ import {
   PlusCircle, 
   QrCode, 
   Settings, 
-  User 
+  User,
+  Menu,
+  LogOut
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
@@ -22,6 +24,8 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/mode-toggle";
+import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface MenuItem {
   title: string;
@@ -62,19 +66,34 @@ const secondaryMenu: MenuItem[] = [
 
 export function AppSidebar() {
   const location = useLocation();
+  const { signOut } = useAuth();
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   
   const isActive = (path: string) => {
     if (path === "/") return location.pathname === path;
     return location.pathname.startsWith(path);
   };
 
+  // Toggle sidebar for mobile
+  const toggleMobileSidebar = () => {
+    setShowMobileSidebar(prev => !prev);
+  };
+
   return (
-    <Sidebar>
+    <Sidebar className={cn(
+      "lg:static fixed z-50 transition-transform duration-300",
+      showMobileSidebar ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+    )}>
       <SidebarHeader className="px-6 py-5 flex items-center">
         <Link to="/" className="flex items-center gap-2">
           <Logo size="small" />
         </Link>
-        <SidebarTrigger />
+        <div className="ml-auto flex items-center gap-2">
+          <SidebarTrigger />
+          <Button variant="ghost" size="icon" className="lg:hidden" onClick={toggleMobileSidebar}>
+            <Menu className="h-5 w-5" />
+          </Button>
+        </div>
       </SidebarHeader>
       <SidebarContent>
         <div className="px-3 py-2">
@@ -118,10 +137,26 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter>
-        <div className="px-3 py-2">
+        <div className="px-3 py-2 flex justify-between items-center">
           <ModeToggle />
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={signOut} 
+            title="Sign out"
+          >
+            <LogOut className="h-4 w-4" />
+          </Button>
         </div>
       </SidebarFooter>
+      
+      {/* Mobile overlay */}
+      {showMobileSidebar && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[-1] lg:hidden"
+          onClick={toggleMobileSidebar}
+        />
+      )}
     </Sidebar>
   );
 }
