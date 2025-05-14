@@ -63,7 +63,7 @@ const AppRoutes = () => {
         <Route path="analytics" element={<DemoAnalytics />} />
       </Route>
       
-      {/* Protected routes */}
+      {/* Protected routes - MainLayout already includes SidebarProvider */}
       <Route 
         path="/" 
         element={
