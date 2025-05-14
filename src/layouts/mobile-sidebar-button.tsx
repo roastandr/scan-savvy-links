@@ -1,7 +1,6 @@
 
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
 import { useMedia } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
