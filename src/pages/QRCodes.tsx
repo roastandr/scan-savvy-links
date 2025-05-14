@@ -52,19 +52,29 @@ export default function QRCodes() {
             if (scanError) {
               console.error("Error fetching scan count:", scanError);
               return {
-                ...qrCode,
+                id: qrCode.id,
+                name: qrCode.name,
+                shortCode: qrCode.slug,
+                targetUrl: qrCode.target_url,
+                createdAt: qrCode.created_at,
+                expiresAt: qrCode.expires_at,
+                active: qrCode.is_active,
                 scanCount: 0,
-              };
+                color: qrCode.color,
+              } as QRCodeData;
             }
             
             return {
-              ...qrCode,
-              scanCount: count || 0,
+              id: qrCode.id,
+              name: qrCode.name,
               shortCode: qrCode.slug,
+              targetUrl: qrCode.target_url,
               createdAt: qrCode.created_at,
               expiresAt: qrCode.expires_at,
               active: qrCode.is_active,
-            };
+              scanCount: count || 0,
+              color: qrCode.color,
+            } as QRCodeData;
           })
         );
         

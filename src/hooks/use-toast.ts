@@ -3,8 +3,8 @@ import { toast as sonnerToast } from "sonner";
 import { ToastActionElement } from "@/components/ui/toast";
 
 type ToastProps = {
-  title?: string;
-  description?: string;
+  title?: React.ReactNode;
+  description?: React.ReactNode;
   action?: ToastActionElement;
   variant?: "default" | "destructive";
 };
@@ -14,8 +14,8 @@ const TOAST_REMOVE_DELAY = 1000000;
 
 type ToasterToast = ToastProps & {
   id: string;
-  title?: string;
-  description?: string;
+  title?: React.ReactNode;
+  description?: React.ReactNode;
   action?: React.ReactNode;
 };
 
@@ -32,30 +32,45 @@ function generateToastId() {
   return (count++).toString();
 }
 
-// This creates the context without toast state
+// Create the toast array
 const toasts: ToasterToast[] = [];
 
-export const useToast = () => {
+export function useToast() {
   const toast = ({ title, description, action, variant }: ToastProps) => {
     const id = generateToastId();
+    
+    // Create a new toast and add it to the toasts array
+    const newToast: ToasterToast = {
+      id,
+      title,
+      description,
+      action
+    };
+    
+    toasts.push(newToast);
+    
+    // Ensure we don't exceed the toast limit
+    if (toasts.length > TOAST_LIMIT) {
+      toasts.shift();
+    }
     
     const options: Parameters<typeof sonnerToast>[1] = {
       id,
       description,
       action,
     };
-    
+
     if (variant === "destructive") {
-      return sonnerToast.error(title, options);
+      options.style = { background: "var(--destructive)", color: "var(--destructive-foreground)" };
     }
     
-    return sonnerToast(title, options);
+    return sonnerToast(title as string, options);
   };
 
   return {
     toast,
     toasts,
   };
-};
+}
 
 export { toast } from "sonner";

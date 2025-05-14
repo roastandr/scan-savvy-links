@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { toast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -13,6 +13,7 @@ export default function Account() {
   const { user } = useAuth();
   const [fullName, setFullName] = useState(user?.user_metadata?.full_name || "");
   const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();

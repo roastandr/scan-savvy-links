@@ -40,7 +40,7 @@ export default function QRCodesNew() {
           name: qrCodeData.name,
           target_url: qrCodeData.targetUrl,
           slug: qrCodeData.shortCode,
-          expires_at: qrCodeData.expiresAt,
+          expires_at: qrCodeData.expiresAt ? qrCodeData.expiresAt.toISOString() : null,
           color: qrCodeData.fgColor,
           background_color: qrCodeData.bgColor,
           user_id: user.id,

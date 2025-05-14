@@ -12,7 +12,7 @@ import { HexColorPicker } from "react-colorful";
 import { generateShortCode } from "@/lib/utils";
 import { CalendarIcon, Copy } from "lucide-react";
 import { format } from "date-fns";
-import { toast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 type QRCodeGeneratorProps = {
   onSave: (qrCodeData: {
@@ -35,6 +35,7 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
   const [bgColor, setBgColor] = useState("#ffffff");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [trackingUrl, setTrackingUrl] = useState("");
+  const { toast } = useToast();
   
   // Generate the tracking URL whenever the shortCode changes
   useEffect(() => {
