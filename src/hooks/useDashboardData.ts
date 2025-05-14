@@ -54,7 +54,7 @@ export const useDashboardData = (user: any, toast: (props: ToastProps) => void) 
   ]);
 
   // Mock data generators
-  const generateMockQrData = () => {
+  const generateMockQrData = useCallback(() => {
     return [
       {
         id: "1",
@@ -90,9 +90,9 @@ export const useDashboardData = (user: any, toast: (props: ToastProps) => void) 
         color: "#DC2626",
       }
     ];
-  };
+  }, []);
 
-  const generateMockScanData = () => {
+  const generateMockScanData = useCallback(() => {
     const data: ScanData[] = [];
     const now = new Date();
     
@@ -107,22 +107,63 @@ export const useDashboardData = (user: any, toast: (props: ToastProps) => void) 
     }
     
     return data;
-  };
+  }, []);
 
   const fetchDashboardData = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      // If no user, use mock data but don't show error state
+      setQrCodes(generateMockQrData());
+      setScanData(generateMockScanData());
+      setLocationData([
+        { name: "United States", value: 124 },
+        { name: "Germany", value: 86 },
+        { name: "United Kingdom", value: 72 },
+        { name: "Canada", value: 51 },
+        { name: "Japan", value: 43 },
+      ]);
+      setDeviceData([
+        { name: "Mobile", value: 245 },
+        { name: "Desktop", value: 108 },
+        { name: "Tablet", value: 43 },
+      ]);
+      setBrowserData([
+        { name: "Chrome", value: 186 },
+        { name: "Safari", value: 124 },
+        { name: "Firefox", value: 53 },
+        { name: "Edge", value: 33 },
+      ]);
+      setOsData([
+        { name: "iOS", value: 148 },
+        { name: "Android", value: 132 },
+        { name: "Windows", value: 86 },
+        { name: "macOS", value: 30 },
+      ]);
+      setIsLoading(false);
+      return;
+    }
     
     setIsLoading(true);
     setHasError(false);
     
     try {
+      // Add a timeout to bail if the request takes too long
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Request timeout")), 10000);
+      });
+      
+      // Fetch QR codes with a timeout
+      const qrCodesPromise = Promise.race([
+        supabase
+          .from('qr_links')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(3),
+        timeoutPromise
+      ]);
+      
       // Fetch QR codes
-      const { data: qrCodesData, error: qrCodesError } = await supabase
-        .from('qr_links')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(3);
+      const { data: qrCodesData, error: qrCodesError } = await qrCodesPromise as any;
       
       if (qrCodesError) throw qrCodesError;
       
@@ -307,24 +348,55 @@ export const useDashboardData = (user: any, toast: (props: ToastProps) => void) 
       // Use mock data on error
       setQrCodes(generateMockQrData());
       setScanData(generateMockScanData());
-      
-      toast({
-        title: "Failed to load dashboard data",
-        description: "There was an error loading your dashboard data. Using demo data instead.",
-        variant: "destructive",
-      });
+      setLocationData([
+        { name: "United States", value: 124 },
+        { name: "Germany", value: 86 },
+        { name: "United Kingdom", value: 72 },
+        { name: "Canada", value: 51 },
+        { name: "Japan", value: 43 },
+      ]);
+      setDeviceData([
+        { name: "Mobile", value: 245 },
+        { name: "Desktop", value: 108 },
+        { name: "Tablet", value: 43 },
+      ]);
+      setBrowserData([
+        { name: "Chrome", value: 186 },
+        { name: "Safari", value: 124 },
+        { name: "Firefox", value: 53 },
+        { name: "Edge", value: 33 },
+      ]);
+      setOsData([
+        { name: "iOS", value: 148 },
+        { name: "Android", value: 132 },
+        { name: "Windows", value: 86 },
+        { name: "macOS", value: 30 },
+      ]);
+
+      // Show error toast only if it's not a network error (which might be annoying on disconnection)
+      if (error.message !== "Network Error" && error.message !== "Failed to fetch") {
+        toast({
+          title: "Failed to load dashboard data",
+          description: "Using demo data instead. " + (error.message || ""),
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [user, toast]);
+  }, [user, toast, generateMockQrData, generateMockScanData]);
 
   // Initial data fetch
   useEffect(() => {
     let isMounted = true;
     
-    if (isMounted) {
-      fetchDashboardData();
-    }
+    const fetchData = async () => {
+      if (isMounted) {
+        await fetchDashboardData();
+      }
+    };
+    
+    fetchData();
     
     return () => {
       isMounted = false;

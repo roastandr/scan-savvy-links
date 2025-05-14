@@ -1,23 +1,14 @@
 
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlusCircle, Loader2 } from "lucide-react";
-import { QRCard, QRCodeData } from "@/components/qr-card";
-import { ScanChart } from "@/components/analytics/scan-chart";
-import { StatsCards } from "@/components/analytics/stats-cards";
-import { LocationChart } from "@/components/analytics/location-chart";
-import { DeviceChart } from "@/components/analytics/device-chart";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import { useDashboardData } from "@/hooks/useDashboardData";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { StatsCards } from "@/components/analytics/stats-cards";
+import { ScanChart } from "@/components/analytics/scan-chart";
+import { QRCodesList } from "@/components/dashboard/QRCodesList";
 import { EmptyQRCodeState } from "@/components/dashboard/EmptyQRCodeState";
 import { DetailedMetrics } from "@/components/dashboard/DetailedMetrics";
-import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
-import { QRCodesList } from "@/components/dashboard/QRCodesList";
+import { DashboardSkeleton } from "@/components/dashboard/LoadingSkeleton";
 
 export default function Dashboard() {
   const { toast } = useToast();
@@ -38,11 +29,7 @@ export default function Dashboard() {
   } = useDashboardData(user, toast);
 
   if (isLoading) {
-    return (
-      <div className="p-6 flex justify-center items-center min-h-[80vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (hasError) {
@@ -57,7 +44,12 @@ export default function Dashboard() {
               There was an error loading your dashboard data. 
               We're showing demo data below as a fallback.
             </p>
-            <Button onClick={retryFetchData}>Try Again</Button>
+            <button 
+              onClick={retryFetchData}
+              className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+            >
+              Try Again
+            </button>
           </div>
         </div>
 
@@ -96,3 +88,7 @@ export default function Dashboard() {
     </div>
   );
 }
+
+// Add missing imports at the top
+import { DeviceChart } from "@/components/analytics/device-chart";
+import { LocationChart } from "@/components/analytics/location-chart";
