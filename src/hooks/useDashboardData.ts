@@ -1,9 +1,8 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { QRCodeData } from "@/components/qr-card";
 import { ScanData } from "@/components/analytics/scan-chart";
-import { Toast } from "@/hooks/use-toast";
+import { ToastProps } from "@/hooks/use-toast";
 
 type ChartDataPoint = { name: string; value: number };
 type StatItem = {
@@ -15,7 +14,7 @@ type StatItem = {
   icon?: React.ReactNode;
 };
 
-export const useDashboardData = (user: any, toast: any) => {
+export const useDashboardData = (user: any, toast: (props: ToastProps) => void) => {
   const [qrCodes, setQrCodes] = useState<QRCodeData[]>([]);
   const [scanData, setScanData] = useState<ScanData[]>([]);
   const [browserData, setBrowserData] = useState<ChartDataPoint[]>([]);

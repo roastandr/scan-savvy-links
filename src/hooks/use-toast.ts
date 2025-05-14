@@ -2,7 +2,7 @@
 import { toast as sonnerToast } from "sonner";
 import { ToastActionElement } from "@/components/ui/toast";
 
-type ToastProps = {
+export type ToastProps = {
   title?: React.ReactNode;
   description?: React.ReactNode;
   action?: ToastActionElement;
