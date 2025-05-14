@@ -1,4 +1,3 @@
-
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useDashboardData } from "@/hooks/useDashboardData";
@@ -9,6 +8,8 @@ import { QRCodesList } from "@/components/dashboard/QRCodesList";
 import { EmptyQRCodeState } from "@/components/dashboard/EmptyQRCodeState";
 import { DetailedMetrics } from "@/components/dashboard/DetailedMetrics";
 import { DashboardSkeleton } from "@/components/dashboard/LoadingSkeleton";
+import { DeviceChart } from "@/components/analytics/device-chart";
+import { LocationChart } from "@/components/analytics/location-chart";
 
 export default function Dashboard() {
   const { toast } = useToast();
@@ -88,7 +89,3 @@ export default function Dashboard() {
     </div>
   );
 }
-
-// Add missing imports at the top
-import { DeviceChart } from "@/components/analytics/device-chart";
-import { LocationChart } from "@/components/analytics/location-chart";
