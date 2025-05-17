@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,14 +16,21 @@ export default function QRCodes() {
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   const { user } = useAuth();
+  
+  // Use refs to track fetching state and prevent duplicate calls
+  const isFetchingRef = useRef(false);
+  const hasDataFetchedRef = useRef(false);
 
   // Fetch QR codes from database
   useEffect(() => {
     const fetchQRCodes = async () => {
-      if (!user) return;
+      if (!user || isFetchingRef.current || hasDataFetchedRef.current) return;
       
       try {
+        // Set fetching flag to prevent concurrent calls
+        isFetchingRef.current = true;
         setIsLoading(true);
+        
         const { data, error } = await supabase
           .from('qr_links')
           .select(`
@@ -41,44 +48,45 @@ export default function QRCodes() {
         
         if (error) throw error;
         
-        // Also fetch scan counts for each QR code
-        const qrCodesWithScans = await Promise.all(
-          (data || []).map(async (qrCode) => {
-            const { count, error: scanError } = await supabase
+        // Batch the scan count queries to reduce database calls
+        const qrIds = (data || []).map(qr => qr.id);
+        let scanCounts: Record<string, number> = {};
+        
+        if (qrIds.length > 0) {
+          // Get scan counts for all QR codes in one query if possible
+          try {
+            const { data: scanData, error: scanError } = await supabase
               .from('scans')
-              .select('id', { count: 'exact', head: true })
-              .eq('qr_link_id', qrCode.id);
+              .select('qr_link_id, id')
+              .in('qr_link_id', qrIds);
             
-            if (scanError) {
-              console.error("Error fetching scan count:", scanError);
-              return {
-                id: qrCode.id,
-                name: qrCode.name,
-                shortCode: qrCode.slug,
-                targetUrl: qrCode.target_url,
-                createdAt: qrCode.created_at,
-                expiresAt: qrCode.expires_at,
-                active: qrCode.is_active,
-                scanCount: 0,
-                color: qrCode.color,
-              } as QRCodeData;
+            if (!scanError && scanData) {
+              // Group scan counts by QR code ID
+              scanCounts = scanData.reduce((acc: Record<string, number>, scan) => {
+                acc[scan.qr_link_id] = (acc[scan.qr_link_id] || 0) + 1;
+                return acc;
+              }, {});
             }
-            
-            return {
-              id: qrCode.id,
-              name: qrCode.name,
-              shortCode: qrCode.slug,
-              targetUrl: qrCode.target_url,
-              createdAt: qrCode.created_at,
-              expiresAt: qrCode.expires_at,
-              active: qrCode.is_active,
-              scanCount: count || 0,
-              color: qrCode.color,
-            } as QRCodeData;
-          })
-        );
+          } catch (countError) {
+            console.error("Error fetching scan counts:", countError);
+          }
+        }
+        
+        // Map QR codes with their scan counts
+        const qrCodesWithScans = (data || []).map(qrCode => ({
+          id: qrCode.id,
+          name: qrCode.name,
+          shortCode: qrCode.slug,
+          targetUrl: qrCode.target_url,
+          createdAt: qrCode.created_at,
+          expiresAt: qrCode.expires_at,
+          active: qrCode.is_active,
+          scanCount: scanCounts[qrCode.id] || 0,
+          color: qrCode.color,
+        } as QRCodeData));
         
         setQrCodes(qrCodesWithScans);
+        hasDataFetchedRef.current = true;
       } catch (error) {
         console.error("Error fetching QR codes:", error);
         toast({
@@ -88,10 +96,16 @@ export default function QRCodes() {
         });
       } finally {
         setIsLoading(false);
+        isFetchingRef.current = false;
       }
     };
     
     fetchQRCodes();
+    
+    // Cleanup function
+    return () => {
+      isFetchingRef.current = false;
+    };
   }, [user, toast]);
 
   // Filter QR codes based on search query
@@ -155,6 +169,89 @@ export default function QRCodes() {
     }
   };
 
+  // Function to refresh data
+  const handleRefresh = () => {
+    hasDataFetchedRef.current = false;
+    fetchQRCodes();
+  };
+
+  // Helper function to fetch data
+  const fetchQRCodes = async () => {
+    if (!user || isFetchingRef.current) return;
+    
+    try {
+      // Set fetching flag
+      isFetchingRef.current = true;
+      setIsLoading(true);
+      
+      const { data, error } = await supabase
+        .from('qr_links')
+        .select(`
+          id, 
+          name, 
+          slug, 
+          target_url, 
+          created_at, 
+          expires_at, 
+          is_active, 
+          color
+        `)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      // Simple approach: get scan counts in one batch
+      const qrIds = (data || []).map(qr => qr.id);
+      let scanCounts: Record<string, number> = {};
+      
+      if (qrIds.length > 0) {
+        // Get scan counts for all QR codes in one query if possible
+        try {
+          const { data: scanData, error: scanError } = await supabase
+            .from('scans')
+            .select('qr_link_id, id')
+            .in('qr_link_id', qrIds);
+          
+          if (!scanError && scanData) {
+            // Group scan counts by QR code ID
+            scanCounts = scanData.reduce((acc: Record<string, number>, scan) => {
+              acc[scan.qr_link_id] = (acc[scan.qr_link_id] || 0) + 1;
+              return acc;
+            }, {});
+          }
+        } catch (countError) {
+          console.error("Error fetching scan counts:", countError);
+        }
+      }
+      
+      // Map QR codes with their scan counts
+      const qrCodesWithScans = (data || []).map(qrCode => ({
+        id: qrCode.id,
+        name: qrCode.name,
+        shortCode: qrCode.slug,
+        targetUrl: qrCode.target_url,
+        createdAt: qrCode.created_at,
+        expiresAt: qrCode.expires_at,
+        active: qrCode.is_active,
+        scanCount: scanCounts[qrCode.id] || 0,
+        color: qrCode.color,
+      } as QRCodeData));
+      
+      setQrCodes(qrCodesWithScans);
+    } catch (error) {
+      console.error("Error fetching QR codes:", error);
+      toast({
+        title: "Failed to load QR codes",
+        description: "There was an error loading your QR codes. Please try refreshing.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+      isFetchingRef.current = false;
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -164,12 +261,18 @@ export default function QRCodes() {
             Manage all your QR codes in one place.
           </p>
         </div>
-        <Button asChild>
-          <Link to="/qr-codes/new">
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Create QR Code
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={handleRefresh} variant="outline" disabled={isLoading}>
+            {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+            Refresh
+          </Button>
+          <Button asChild>
+            <Link to="/qr-codes/new">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Create QR Code
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-center gap-4">

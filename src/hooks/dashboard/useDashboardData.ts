@@ -48,12 +48,16 @@ export const useDashboardData = (user: any, toast: (props: ToastProps) => void) 
     },
   ]);
   
+  // Use a ref to track if we're currently fetching data
+  const isFetchingRef = useRef(false);
   // Use a ref to track if we've already fetched data
   const dataFetchedRef = useRef(false);
 
   const fetchDashboardData = useCallback(async () => {
-    if (!user) return;
+    if (!user || isFetchingRef.current) return;
     
+    // Set the fetching flag to prevent multiple concurrent fetches
+    isFetchingRef.current = true;
     setIsLoading(true);
     setHasError(false);
     
@@ -82,6 +86,7 @@ export const useDashboardData = (user: any, toast: (props: ToastProps) => void) 
       setHasError(true);
     } finally {
       setIsLoading(false);
+      isFetchingRef.current = false;
     }
   }, [user, toast]);
 
@@ -94,7 +99,8 @@ export const useDashboardData = (user: any, toast: (props: ToastProps) => void) 
     }
     
     return () => {
-      // No cleanup needed
+      // Reset the fetching flag if component unmounts during fetch
+      isFetchingRef.current = false;
     };
   }, [fetchDashboardData]);
 
@@ -108,6 +114,8 @@ export const useDashboardData = (user: any, toast: (props: ToastProps) => void) 
 
   // Function to manually retry data fetching
   const retryFetchData = useCallback(() => {
+    // Reset the dataFetched flag to allow a new fetch
+    dataFetchedRef.current = false;
     fetchDashboardData();
   }, [fetchDashboardData]);
 

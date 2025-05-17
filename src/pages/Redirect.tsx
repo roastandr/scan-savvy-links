@@ -1,5 +1,4 @@
-
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { Logo } from "@/components/logo";
@@ -9,8 +8,13 @@ export default function Redirect() {
   const { shortCode } = useParams();
   const [status, setStatus] = useState<"loading" | "notFound" | "redirecting">("loading");
   const [targetUrl, setTargetUrl] = useState<string | null>(null);
+  // Use ref to track if we already processed the lookup
+  const lookupProcessedRef = useRef(false);
   
   useEffect(() => {
+    // Prevent multiple lookups for the same short code
+    if (lookupProcessedRef.current) return;
+    
     const lookupShortCode = async () => {
       if (!shortCode) {
         setStatus("notFound");
@@ -18,6 +22,9 @@ export default function Redirect() {
       }
 
       try {
+        // Mark lookup as processed to prevent recursive calls
+        lookupProcessedRef.current = true;
+        
         // Get QR link info from database
         const { data: qrLink, error } = await supabase
           .from('qr_links')
@@ -51,17 +58,22 @@ export default function Redirect() {
         const os = detectOS(userAgent);
         const referrer = document.referrer;
 
-        // Record the scan
-        const { error: scanError } = await supabase.rpc('record_scan', {
-          qr_link_id_param: qrLink.id,
-          device_type_param: deviceType,
-          browser_param: browser,
-          os_param: os,
-          referrer_param: referrer
-        });
-
-        if (scanError) {
-          console.error("Error recording scan:", scanError);
+        // Record the scan - run this in background without waiting
+        try {
+          supabase.rpc('record_scan', {
+            qr_link_id_param: qrLink.id,
+            device_type_param: deviceType,
+            browser_param: browser,
+            os_param: os,
+            referrer_param: referrer
+          }).then(({ error: scanError }) => {
+            if (scanError) {
+              console.error("Error recording scan:", scanError);
+            }
+          });
+        } catch (recordError) {
+          // Just log the error, don't prevent redirect
+          console.error("Error in scan recording:", recordError);
         }
         
         // Wait a bit, then redirect
@@ -76,6 +88,8 @@ export default function Redirect() {
     };
     
     lookupShortCode();
+    
+    // Cleanup - no need to do anything specific here
   }, [shortCode]);
   
   // Simple browser detection

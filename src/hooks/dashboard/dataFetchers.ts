@@ -32,13 +32,14 @@ const isCacheValid = (): boolean => {
   return now - dataCache.timestamp < CACHE_EXPIRY_MS;
 };
 
-// Fetch QR codes for a user
+// Fetch QR codes for a user with proper timeout handling
 export const fetchUserQRCodes = async (userId: string): Promise<QRCodeData[]> => {
   const timeoutPromise = new Promise<never>((_, reject) => {
     setTimeout(() => reject(new Error("QR codes fetch timeout")), 20000);
   });
   
   try {
+    // Use Promise.race to handle timeouts
     const { data, error } = await Promise.race([
       supabase
         .from('qr_links')
@@ -55,34 +56,34 @@ export const fetchUserQRCodes = async (userId: string): Promise<QRCodeData[]> =>
       return generateMockQrData();
     }
     
-    // Process the QR codes data
-    const processedQRCodes = await Promise.all(
-      data.map(async (qr: any) => {
-        try {
-          const scanCountPromise = Promise.race([
-            supabase
-              .from('scans')
-              .select('*', { count: 'exact', head: true })
-              .eq('qr_link_id', qr.id),
-            new Promise<never>((_, reject) => {
-              setTimeout(() => reject(new Error("Scan count query timeout")), 10000);
-            })
-          ]);
+    // Get all QR IDs for batch scan count query
+    const qrIds = data.map((qr: any) => qr.id);
+    let scanCounts: Record<string, number> = {};
+    
+    // Batch fetch scan counts for all QR codes at once
+    if (qrIds.length > 0) {
+      try {
+        const { data: scanData, error: scanError } = await supabase
+          .from('scans')
+          .select('qr_link_id, id')
+          .in('qr_link_id', qrIds);
           
-          const { count, error } = await scanCountPromise as any;
-          
-          if (error) {
-            console.warn("Error fetching scan count:", error);
-            return mapQrCodeData(qr, 0);
-          }
-          
-          return mapQrCodeData(qr, count || 0);
-        } catch (err) {
-          console.error("Error processing QR code:", err);
-          return mapQrCodeData(qr, 0);
+        if (!scanError && scanData) {
+          // Group counts by QR ID
+          scanCounts = scanData.reduce((acc: Record<string, number>, scan: any) => {
+            acc[scan.qr_link_id] = (acc[scan.qr_link_id] || 0) + 1;
+            return acc;
+          }, {});
         }
-      })
-    );
+      } catch (err) {
+        console.error("Error batch fetching scan counts:", err);
+      }
+    }
+    
+    // Process the QR codes data with scan counts
+    const processedQRCodes = data.map((qr: any) => {
+      return mapQrCodeData(qr, scanCounts[qr.id] || 0);
+    });
     
     return processedQRCodes;
   } catch (err) {
@@ -106,13 +107,14 @@ const mapQrCodeData = (qrData: any, scanCount: number): QRCodeData => {
   };
 };
 
-// Fetch scan history for a user
+// Fetch scan history for a user with proper error handling
 export const fetchScanHistory = async (userId: string): Promise<ScanData[]> => {
   try {
     const today = new Date();
     const twoWeeksAgo = new Date();
     twoWeeksAgo.setDate(today.getDate() - 13); // 14 days including today
     
+    // Use Promise.race for timeout handling
     const scanHistoryPromise = Promise.race([
       supabase
         .from('scans')
@@ -167,12 +169,12 @@ export const fetchScanHistory = async (userId: string): Promise<ScanData[]> => {
   }
 };
 
-// Main function to fetch all dashboard data
+// Main function to fetch all dashboard data with improved caching
 export const fetchAllDashboardData = async (
   user: any, 
   onError: (message: string) => void
 ): Promise<FetchDashboardDataResult> => {
-  // Return cached data if valid
+  // Return cached data if valid to prevent unnecessary API calls
   if (isCacheValid() && dataCache) {
     console.log("Using cached dashboard data");
     return dataCache.data;
@@ -198,6 +200,7 @@ export const fetchAllDashboardData = async (
   
   try {
     console.log("Fetching fresh dashboard data");
+    
     // Fetch QR codes data
     const qrCodesData = await fetchUserQRCodes(user.id);
     
@@ -212,12 +215,12 @@ export const fetchAllDashboardData = async (
       scanData: scanHistoryData,
       locationData,
       deviceData,
-      browserData,
-      osData,
+      browserData: Array.isArray(browserData) ? browserData : [],
+      osData: Array.isArray(osData) ? osData : [],
       hasError: false
     };
     
-    // Update cache
+    // Update cache with timestamp
     dataCache = {
       timestamp: Date.now(),
       data: result
@@ -242,8 +245,8 @@ export const fetchAllDashboardData = async (
       scanData: mockScanData,
       locationData,
       deviceData,
-      browserData,
-      osData,
+      browserData: Array.isArray(browserData) ? browserData : [],
+      osData: Array.isArray(osData) ? osData : [],
       hasError: true
     };
     
