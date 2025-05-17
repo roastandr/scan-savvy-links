@@ -1,6 +1,7 @@
+
 import { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import { Loader2, Link, AlertCircle } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -8,6 +9,7 @@ export default function Redirect() {
   const { shortCode } = useParams();
   const [status, setStatus] = useState<"loading" | "notFound" | "redirecting">("loading");
   const [targetUrl, setTargetUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   // Use ref to track if we already processed the lookup
   const lookupProcessedRef = useRef(false);
   
@@ -25,6 +27,8 @@ export default function Redirect() {
         // Mark lookup as processed to prevent recursive calls
         lookupProcessedRef.current = true;
         
+        console.log("Looking up short code:", shortCode);
+        
         // Get QR link info from database
         const { data: qrLink, error } = await supabase
           .from('qr_links')
@@ -32,24 +36,42 @@ export default function Redirect() {
           .eq('slug', shortCode)
           .single();
         
-        if (error || !qrLink) {
+        if (error) {
           console.error("Error looking up short code:", error);
           setStatus("notFound");
+          setError(`Database error: ${error.message}`);
           return;
         }
+
+        if (!qrLink) {
+          console.error("QR link not found for shortcode:", shortCode);
+          setStatus("notFound");
+          setError("QR code not found in database");
+          return;
+        }
+
+        console.log("QR link found:", qrLink);
 
         // Check if QR code is active and not expired
         if (!qrLink.is_active) {
           setStatus("notFound");
+          setError("This QR code has been deactivated");
           return;
         }
 
         if (qrLink.expires_at && new Date(qrLink.expires_at) < new Date()) {
           setStatus("notFound");
+          setError("This QR code has expired");
           return;
         }
 
-        setTargetUrl(qrLink.target_url);
+        // Ensure target URL has a protocol
+        let finalTargetUrl = qrLink.target_url;
+        if (finalTargetUrl && !finalTargetUrl.match(/^https?:\/\//i)) {
+          finalTargetUrl = `https://${finalTargetUrl}`;
+        }
+
+        setTargetUrl(finalTargetUrl);
 
         // Collect browser and device info
         const userAgent = navigator.userAgent;
@@ -58,8 +80,17 @@ export default function Redirect() {
         const os = detectOS(userAgent);
         const referrer = document.referrer;
 
+        console.log("Recording scan with data:", {
+          qr_link_id: qrLink.id,
+          device_type: deviceType,
+          browser: browser,
+          os: os,
+          referrer: referrer
+        });
+
         // Record the scan - run this in background without waiting
         try {
+          // Use Promise to handle the async operation
           supabase.rpc('record_scan', {
             qr_link_id_param: qrLink.id,
             device_type_param: deviceType,
@@ -69,6 +100,8 @@ export default function Redirect() {
           }).then(({ error: scanError }) => {
             if (scanError) {
               console.error("Error recording scan:", scanError);
+            } else {
+              console.log("Scan recorded successfully");
             }
           });
         } catch (recordError) {
@@ -79,17 +112,28 @@ export default function Redirect() {
         // Wait a bit, then redirect
         setStatus("redirecting");
         setTimeout(() => {
-          window.location.href = qrLink.target_url;
+          if (finalTargetUrl) {
+            console.log("Redirecting to:", finalTargetUrl);
+            window.location.href = finalTargetUrl;
+          } else {
+            console.error("Target URL is null or empty");
+            setStatus("notFound");
+            setError("Invalid target URL");
+          }
         }, 1500);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error in redirect process:", error);
         setStatus("notFound");
+        setError(`Unexpected error: ${error.message || "Unknown error"}`);
       }
     };
     
     lookupShortCode();
     
-    // Cleanup - no need to do anything specific here
+    return () => {
+      // Cleanup - mark as processed to prevent additional calls
+      lookupProcessedRef.current = true;
+    };
   }, [shortCode]);
   
   // Simple browser detection
@@ -142,13 +186,18 @@ export default function Redirect() {
         
         {status === "notFound" && (
           <div className="flex flex-col items-center gap-2">
-            <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-              <span className="text-2xl">🔍</span>
+            <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center">
+              <AlertCircle className="h-6 w-6 text-red-600" />
             </div>
-            <h1 className="text-xl font-bold mt-4">QR Code Not Found</h1>
+            <h1 className="text-xl font-bold mt-4">QR Code Error</h1>
             <p className="text-muted-foreground">
-              The QR code you scanned doesn't exist, has expired, or has been deactivated.
+              {error || "The QR code you scanned doesn't exist, has expired, or has been deactivated."}
             </p>
+            <div className="mt-4">
+              <a href="/" className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
+                <Link className="h-4 w-4 mr-2" /> Return Home
+              </a>
+            </div>
           </div>
         )}
       </div>

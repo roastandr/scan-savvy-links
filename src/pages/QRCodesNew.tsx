@@ -3,9 +3,9 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { QRCodeGenerator } from "@/components/qr-code-generator";
 import { useToast } from "@/hooks/use-toast";
-import { generateShortCode } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { Loader2 } from "lucide-react";
 
 export default function QRCodesNew() {
   const [isLoading, setIsLoading] = useState(false);
@@ -33,6 +33,23 @@ export default function QRCodesNew() {
     setIsLoading(true);
 
     try {
+      // Validate the URL format
+      try {
+        new URL(qrCodeData.targetUrl);
+      } catch (err) {
+        throw new Error("Please enter a valid URL including http:// or https://");
+      }
+
+      console.log("Saving QR code with data:", {
+        name: qrCodeData.name,
+        target_url: qrCodeData.targetUrl,
+        slug: qrCodeData.shortCode,
+        expires_at: qrCodeData.expiresAt,
+        color: qrCodeData.fgColor,
+        background_color: qrCodeData.bgColor,
+        user_id: user.id,
+      });
+
       // Save QR code to database
       const { data, error } = await supabase
         .from('qr_links')
@@ -44,6 +61,7 @@ export default function QRCodesNew() {
           color: qrCodeData.fgColor,
           background_color: qrCodeData.bgColor,
           user_id: user.id,
+          is_active: true,
         })
         .select('id')
         .single();
@@ -55,7 +73,7 @@ export default function QRCodesNew() {
         description: "Your QR code has been created successfully.",
       });
       
-      navigate("/qr-codes");
+      navigate(`/qr-codes/${data.id}`);
     } catch (error: any) {
       console.error("Error saving QR code:", error);
       toast({
@@ -76,6 +94,15 @@ export default function QRCodesNew() {
           Generate a custom QR code with tracking capabilities.
         </p>
       </div>
+
+      {isLoading && (
+        <div className="fixed inset-0 bg-background/80 flex items-center justify-center z-50">
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p>Creating your QR code...</p>
+          </div>
+        </div>
+      )}
 
       <QRCodeGenerator onSave={handleSaveQRCode} isLoading={isLoading} />
     </div>

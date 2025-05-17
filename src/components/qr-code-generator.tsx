@@ -10,7 +10,7 @@ import { DatePicker } from "@/components/date-picker";
 import { Card, CardContent } from "@/components/ui/card";
 import { HexColorPicker } from "react-colorful";
 import { generateShortCode } from "@/lib/utils";
-import { CalendarIcon, Copy } from "lucide-react";
+import { CalendarIcon, Copy, Link } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -52,7 +52,11 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
       newErrors.targetUrl = "Target URL is required";
     } else {
       try {
-        new URL(targetUrl);
+        // Ensure URL has protocol
+        if (!targetUrl.match(/^https?:\/\//i)) {
+          setTargetUrl(`https://${targetUrl}`);
+        }
+        new URL(targetUrl.match(/^https?:\/\//i) ? targetUrl : `https://${targetUrl}`);
       } catch (error) {
         newErrors.targetUrl = "Please enter a valid URL";
       }
@@ -67,10 +71,17 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Ensure URL has protocol
+    let processedUrl = targetUrl;
+    if (processedUrl && !processedUrl.match(/^https?:\/\//i)) {
+      processedUrl = `https://${processedUrl}`;
+      setTargetUrl(processedUrl);
+    }
+    
     if (validateForm()) {
       onSave({
         name,
-        targetUrl,
+        targetUrl: processedUrl,
         shortCode,
         expiresAt,
         fgColor,
@@ -116,13 +127,19 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
           
           <div className="space-y-2">
             <Label htmlFor="targetUrl">Target URL</Label>
-            <Input
-              id="targetUrl"
-              placeholder="https://example.com"
-              value={targetUrl}
-              onChange={(e) => setTargetUrl(e.target.value)}
-              className={errors.targetUrl ? "border-destructive" : ""}
-            />
+            <div className="flex items-center space-x-1 rounded-md border border-input px-3 py-1">
+              <Link className="h-4 w-4 text-muted-foreground" />
+              <Input
+                id="targetUrl"
+                placeholder="example.com"
+                value={targetUrl}
+                onChange={(e) => setTargetUrl(e.target.value)}
+                className={`${errors.targetUrl ? "border-destructive" : ""} border-none px-0`}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Enter a website URL (https:// will be added if missing)
+            </p>
             {errors.targetUrl && <p className="text-xs text-destructive">{errors.targetUrl}</p>}
           </div>
           
@@ -218,7 +235,7 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
       <div className="flex flex-col items-center justify-center">
         <div className="p-4 rounded-xl bg-white shadow-lg">
           <QRCodeSVG
-            value={trackingUrl || "https://qrtrakr.com"}
+            value={trackingUrl || window.location.origin}
             size={280}
             fgColor={fgColor}
             bgColor={bgColor}
@@ -229,7 +246,7 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
         <div className="mt-4 text-center space-y-1">
           <p className="font-medium">{name || "QR Code Preview"}</p>
           <p className="text-sm text-muted-foreground">
-            {targetUrl || "https://qrtrakr.com"}
+            {targetUrl || "Your target URL"}
           </p>
           {expiresAt && (
             <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">

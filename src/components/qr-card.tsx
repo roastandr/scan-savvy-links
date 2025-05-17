@@ -41,6 +41,11 @@ export function QRCard({ qrCode, onDelete, onToggleActive }: QRCardProps) {
     onToggleActive(qrCode.id, newState);
   };
 
+  // Ensure URL has proper format for display
+  const displayUrl = qrCode.targetUrl && !qrCode.targetUrl.match(/^https?:\/\//i) 
+    ? `https://${qrCode.targetUrl}`
+    : qrCode.targetUrl;
+
   return (
     <Card className="overflow-hidden transition-all hover:shadow-md">
       <CardHeader className="pb-2">
@@ -49,8 +54,8 @@ export function QRCard({ qrCode, onDelete, onToggleActive }: QRCardProps) {
             <CardTitle className="text-lg font-medium">{qrCode.name}</CardTitle>
             <CardDescription>
               <div className="flex gap-2 items-center text-xs">
-                <span>{truncateString(qrCode.targetUrl, 30)}</span>
-                <a href={qrCode.targetUrl} target="_blank" rel="noopener noreferrer">
+                <span>{truncateString(displayUrl, 30)}</span>
+                <a href={displayUrl} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="h-3 w-3" />
                 </a>
               </div>
@@ -86,6 +91,9 @@ export function QRCard({ qrCode, onDelete, onToggleActive }: QRCardProps) {
             <div className="text-2xl font-bold">{qrCode.scanCount}</div>
             <div className="text-xs text-muted-foreground">Scans</div>
           </div>
+        </div>
+        <div className="mt-2 text-xs text-muted-foreground">
+          <span className="font-medium">Tracking URL:</span> {window.location.origin}/r/{qrCode.shortCode}
         </div>
       </CardContent>
       <CardFooter className="pt-0">
