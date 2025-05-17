@@ -44,13 +44,24 @@ export function DeviceChart({
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
-      const total = data.reduce((a: number, b: DeviceData) => a + b.value, 0);
-      const percentage = Math.round((data.value / total) * 100);
+      
+      // Fix: Check if data is an array before calling reduce
+      // The payload structure from recharts is different than expected
+      // Instead, we get the direct value from the current payload item
+      const value = data.value;
+      
+      // Calculate total from the full dataset array
+      const total = Array.isArray(data) 
+        ? data.reduce((a: number, b: DeviceData) => a + b.value, 0)
+        : data.value > 0 ? data.value : 0;
+      
+      // Calculate percentage safely
+      const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
       
       return (
         <div className="bg-popover border border-border p-3 rounded-md shadow-md">
           <p className="text-sm font-medium">{data.name}</p>
-          <p className="text-sm text-primary">{data.value} scans</p>
+          <p className="text-sm text-primary">{value} scans</p>
           <p className="text-xs text-muted-foreground">{percentage}% of total</p>
         </div>
       );

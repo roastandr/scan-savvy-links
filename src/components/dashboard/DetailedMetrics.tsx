@@ -10,6 +10,11 @@ interface DetailedMetricsProps {
 }
 
 export function DetailedMetrics({ browserData, osData, deviceData, locationData }: DetailedMetricsProps) {
+  // Ensure data is always an array
+  const ensureArray = (data: any) => {
+    return Array.isArray(data) ? data : [];
+  };
+  
   return (
     <Tabs defaultValue="browser">
       <div className="mb-4">
@@ -21,7 +26,7 @@ export function DetailedMetrics({ browserData, osData, deviceData, locationData 
       </div>
       <TabsContent value="browser">
         <DeviceChart
-          data={browserData}
+          data={ensureArray(browserData)}
           title="Browser Distribution"
           description="Web browsers used to scan your QR codes"
           type="browser"
@@ -29,7 +34,7 @@ export function DetailedMetrics({ browserData, osData, deviceData, locationData 
       </TabsContent>
       <TabsContent value="os">
         <DeviceChart
-          data={osData}
+          data={ensureArray(osData)}
           title="OS Distribution"
           description="Operating systems scanning your QR codes"
           type="os"
