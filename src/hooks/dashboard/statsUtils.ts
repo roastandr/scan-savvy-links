@@ -12,10 +12,17 @@ export type StatItem = {
 };
 
 export const calculateStats = (qrCodes: QRCodeData[], scanData: ScanData[]): StatItem[] => {
-  const totalScans = Math.floor(Math.random() * 500) + 100;
+  // Calculate total scans from scan data
+  const totalScans = scanData.reduce((sum, day) => sum + day.count, 0) || Math.floor(Math.random() * 500) + 100;
+  
   const activeQRCodes = qrCodes.filter(qr => qr.active).length;
   const totalQRCodes = qrCodes.length;
-  const avgScansPerDay = Math.floor(totalScans / 14);
+  
+  // Calculate average scans more accurately
+  const avgScansPerDay = scanData.length > 0 
+    ? Math.floor(totalScans / scanData.length) 
+    : Math.floor(Math.random() * 20) + 5;
+    
   const conversionRate = Math.min(Math.round(Math.random() * 30) + 10, 100);
 
   return [
@@ -37,7 +44,7 @@ export const calculateStats = (qrCodes: QRCodeData[], scanData: ScanData[]): Sta
       value: avgScansPerDay.toString(),
       description: "Last 14 days",
       change: 5,
-      data: [5, 10, 15, 20, 25, 30, 35].map((v, i) => ({ name: i.toString(), value: v })),
+      data: scanData.slice(-7).map((item, i) => ({ name: i.toString(), value: Math.max(item.count, 5) })),
     },
     {
       title: "Conversion Rate",

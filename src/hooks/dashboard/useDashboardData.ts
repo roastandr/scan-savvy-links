@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { QRCodeData } from "@/components/qr-card";
@@ -70,9 +71,9 @@ export const useDashboardData = (user: any, toast: (props: ToastProps) => void) 
     setHasError(false);
     
     try {
-      // Add a timeout to bail if the request takes too long
+      // Increase timeout to 20 seconds to prevent premature timeouts
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("Request timeout")), 10000);
+        setTimeout(() => reject(new Error("Request timeout")), 20000);
       });
       
       // Fetch QR codes with a timeout
@@ -82,7 +83,7 @@ export const useDashboardData = (user: any, toast: (props: ToastProps) => void) 
           .select('*')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
-          .limit(3),
+          .limit(10),  // Increased limit for better data display
         timeoutPromise
       ]);
       
@@ -95,14 +96,38 @@ export const useDashboardData = (user: any, toast: (props: ToastProps) => void) 
       let processedQRCodes: QRCodeData[] = [];
       
       if (qrCodesData && qrCodesData.length > 0) {
-        // Add scan counts to QR codes
+        // Add scan counts to QR codes - with improved error handling
         processedQRCodes = await Promise.all(
           qrCodesData.map(async (qr) => {
             try {
-              const { count } = await supabase
-                .from('scans')
-                .select('*', { count: 'exact', head: true })
-                .eq('qr_link_id', qr.id);
+              // Use timeoutPromise for scan count queries too
+              const scanCountPromise = Promise.race([
+                supabase
+                  .from('scans')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('qr_link_id', qr.id),
+                new Promise((_, reject) => {
+                  setTimeout(() => reject(new Error("Scan count query timeout")), 10000);
+                })
+              ]);
+              
+              const { count, error } = await scanCountPromise as any;
+              
+              if (error) {
+                console.warn("Error fetching scan count:", error);
+                // Continue with count as 0 instead of failing
+                return {
+                  id: qr.id,
+                  name: qr.name,
+                  shortCode: qr.slug,
+                  targetUrl: qr.target_url,
+                  createdAt: qr.created_at,
+                  expiresAt: qr.expires_at,
+                  active: qr.is_active,
+                  scanCount: 0,
+                  color: qr.color,
+                };
+              }
               
               return {
                 id: qr.id,
@@ -117,6 +142,7 @@ export const useDashboardData = (user: any, toast: (props: ToastProps) => void) 
               };
             } catch (err) {
               console.error("Error fetching scan count:", err);
+              // Continue with count as 0 instead of failing
               return {
                 id: qr.id,
                 name: qr.name,
@@ -146,15 +172,23 @@ export const useDashboardData = (user: any, toast: (props: ToastProps) => void) 
       let scanDataArray: ScanData[] = [];
       
       try {
-        const { data: scanHistoryData, error: scanHistoryError } = await supabase
-          .from('scans')
-          .select(`
-            timestamp,
-            qr_links!inner(user_id)
-          `)
-          .eq('qr_links.user_id', user.id)
-          .gte('timestamp', twoWeeksAgo.toISOString())
-          .order('timestamp', { ascending: true });
+        // Add timeout for scan history query too
+        const scanHistoryPromise = Promise.race([
+          supabase
+            .from('scans')
+            .select(`
+              timestamp,
+              qr_links!inner(user_id)
+            `)
+            .eq('qr_links.user_id', user.id)
+            .gte('timestamp', twoWeeksAgo.toISOString())
+            .order('timestamp', { ascending: true }),
+          new Promise((_, reject) => {
+            setTimeout(() => reject(new Error("Scan history query timeout")), 10000);
+          })
+        ]);
+        
+        const { data: scanHistoryData, error: scanHistoryError } = await scanHistoryPromise as any;
         
         if (scanHistoryError) throw scanHistoryError;
         
