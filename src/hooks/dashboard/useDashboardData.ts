@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { QRCodeData } from "@/components/qr-card";
 import { ScanData } from "@/components/analytics/scan-chart";
 import { ToastProps } from "@/hooks/use-toast";
@@ -47,8 +47,13 @@ export const useDashboardData = (user: any, toast: (props: ToastProps) => void) 
       data: [] as { name: string; value: number }[]
     },
   ]);
+  
+  // Use a ref to track if we've already fetched data
+  const dataFetchedRef = useRef(false);
 
   const fetchDashboardData = useCallback(async () => {
+    if (!user) return;
+    
     setIsLoading(true);
     setHasError(false);
     
@@ -82,18 +87,14 @@ export const useDashboardData = (user: any, toast: (props: ToastProps) => void) 
 
   // Initial data fetch
   useEffect(() => {
-    let isMounted = true;
-    
-    const fetchData = async () => {
-      if (isMounted) {
-        await fetchDashboardData();
-      }
-    };
-    
-    fetchData();
+    // Only fetch once on initial load
+    if (!dataFetchedRef.current) {
+      fetchDashboardData();
+      dataFetchedRef.current = true;
+    }
     
     return () => {
-      isMounted = false;
+      // No cleanup needed
     };
   }, [fetchDashboardData]);
 

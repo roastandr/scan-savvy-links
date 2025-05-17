@@ -16,6 +16,22 @@ export type FetchDashboardDataResult = {
   hasError: boolean;
 };
 
+// Cache mechanism to prevent redundant API calls
+type CacheData = {
+  timestamp: number;
+  data: FetchDashboardDataResult;
+};
+
+let dataCache: CacheData | null = null;
+const CACHE_EXPIRY_MS = 1000 * 60 * 5; // 5 minutes
+
+// Helper function to check cache validity
+const isCacheValid = (): boolean => {
+  if (!dataCache) return false;
+  const now = Date.now();
+  return now - dataCache.timestamp < CACHE_EXPIRY_MS;
+};
+
 // Fetch QR codes for a user
 export const fetchUserQRCodes = async (userId: string): Promise<QRCodeData[]> => {
   const timeoutPromise = new Promise<never>((_, reject) => {
@@ -156,12 +172,18 @@ export const fetchAllDashboardData = async (
   user: any, 
   onError: (message: string) => void
 ): Promise<FetchDashboardDataResult> => {
+  // Return cached data if valid
+  if (isCacheValid() && dataCache) {
+    console.log("Using cached dashboard data");
+    return dataCache.data;
+  }
+  
   if (!user) {
     const mockQrData = generateMockQrData();
     const mockScanData = generateMockScanData();
     const { locationData, deviceData, browserData, osData } = generateMockAnalyticsData();
     
-    return {
+    const mockData: FetchDashboardDataResult = {
       qrCodes: mockQrData,
       scanData: mockScanData,
       locationData,
@@ -170,9 +192,12 @@ export const fetchAllDashboardData = async (
       osData,
       hasError: false
     };
+    
+    return mockData;
   }
   
   try {
+    console.log("Fetching fresh dashboard data");
     // Fetch QR codes data
     const qrCodesData = await fetchUserQRCodes(user.id);
     
@@ -182,7 +207,7 @@ export const fetchAllDashboardData = async (
     // For now, using mock data for analytics
     const { locationData, deviceData, browserData, osData } = generateMockAnalyticsData();
     
-    return {
+    const result: FetchDashboardDataResult = {
       qrCodes: qrCodesData,
       scanData: scanHistoryData,
       locationData,
@@ -191,6 +216,14 @@ export const fetchAllDashboardData = async (
       osData,
       hasError: false
     };
+    
+    // Update cache
+    dataCache = {
+      timestamp: Date.now(),
+      data: result
+    };
+    
+    return result;
   } catch (error: any) {
     console.error("Error fetching dashboard data:", error);
     
@@ -204,7 +237,7 @@ export const fetchAllDashboardData = async (
       onError(error.message || "Failed to load dashboard data");
     }
     
-    return {
+    const errorResult: FetchDashboardDataResult = {
       qrCodes: mockQrData,
       scanData: mockScanData,
       locationData,
@@ -213,5 +246,7 @@ export const fetchAllDashboardData = async (
       osData,
       hasError: true
     };
+    
+    return errorResult;
   }
 };
