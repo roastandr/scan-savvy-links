@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { QRCodeData } from "@/components/qr-card";
@@ -282,9 +281,4 @@ export const useDashboardData = (user: any, toast: (props: ToastProps) => void) 
     handleToggleActive: toggleActive,
     retryFetchData
   };
-};
-
-export type {
-  StatItem,
-  ChartDataPoint
 };

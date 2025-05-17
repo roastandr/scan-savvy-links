@@ -1,6 +1,7 @@
 
 // This is now a barrel file that re-exports from the refactored module
-import { useDashboardData } from "./dashboard/useDashboardData";
-export type { StatItem, ChartDataPoint } from "./dashboard/useDashboardData";
+import { useDashboardData, ChartDataPoint } from "./dashboard/useDashboardData";
+import { StatItem } from "./dashboard/statsUtils";
 
+export type { StatItem, ChartDataPoint };
 export { useDashboardData };
