@@ -1,5 +1,5 @@
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { QRCodeGenerator } from "@/components/qr-code-generator";
 import { useToast } from "@/hooks/use-toast";
@@ -43,6 +43,28 @@ export default function QRCodesNew() {
     }
   };
 
+  // Check for duplicate shortCode
+  const checkDuplicateShortCode = async (shortCode: string): Promise<boolean> => {
+    if (!shortCode) return false;
+    
+    try {
+      const { data, error } = await supabase
+        .from('qr_links')
+        .select('id')
+        .eq('slug', shortCode);
+      
+      if (error) {
+        console.error("Error checking duplicate short code:", error);
+        return false;
+      }
+      
+      return data && data.length > 0;
+    } catch (error) {
+      console.error("Error checking duplicate short code:", error);
+      return false;
+    }
+  };
+
   const handleSaveQRCode = async (qrCodeData: {
     name: string;
     targetUrl: string;
@@ -51,8 +73,10 @@ export default function QRCodesNew() {
     fgColor: string;
     bgColor: string;
   }) => {
+    // Prevent duplicate submissions
     if (submittingRef.current) {
-      return; // Prevent duplicate submissions
+      console.log("Submission already in progress, preventing duplicate submission");
+      return;
     }
     
     if (!user) {
@@ -63,6 +87,38 @@ export default function QRCodesNew() {
       });
       return;
     }
+    
+    // Ensure we have a name
+    if (!qrCodeData.name.trim()) {
+      toast({
+        title: "Name required",
+        description: "Please provide a name for your QR code",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Ensure we have a target URL
+    if (!qrCodeData.targetUrl.trim()) {
+      toast({
+        title: "Target URL required",
+        description: "Please provide a target URL for your QR code",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Ensure we have a short code
+    if (!qrCodeData.shortCode.trim()) {
+      toast({
+        title: "Short code required",
+        description: "Please provide a short code for your QR code",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    console.log("Checking for duplicate name:", qrCodeData.name);
     
     // Check if name already exists before proceeding
     const isDuplicate = await checkDuplicateName(qrCodeData.name);
@@ -75,8 +131,22 @@ export default function QRCodesNew() {
       return;
     }
     
+    console.log("Checking for duplicate short code:", qrCodeData.shortCode);
+    
+    // Check if short code already exists
+    const isDuplicateShortCode = await checkDuplicateShortCode(qrCodeData.shortCode);
+    if (isDuplicateShortCode) {
+      toast({
+        title: "Duplicate short code",
+        description: "This short code is already in use. Please generate a new one.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     submittingRef.current = true;
     setIsLoading(true);
+    console.log("Starting submission, isLoading set to true");
 
     try {
       // Validate the URL format
@@ -91,16 +161,8 @@ export default function QRCodesNew() {
         throw new Error("Expiration date cannot be in the past");
       }
       
-      // Check for duplicate shortCode
-      const { data: existingShortCode, error: shortCodeError } = await supabase
-        .from('qr_links')
-        .select('id')
-        .eq('slug', qrCodeData.shortCode);
+      console.log("Saving QR code to database");
       
-      if (!shortCodeError && existingShortCode && existingShortCode.length > 0) {
-        throw new Error("This short code is already in use. Please generate a new one.");
-      }
-
       // Save QR code to database
       const { data, error } = await supabase
         .from('qr_links')
@@ -117,7 +179,12 @@ export default function QRCodesNew() {
         .select('id')
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error("Database error:", error);
+        throw error;
+      }
+      
+      console.log("QR code created successfully, id:", data.id);
       
       toast({
         title: "QR Code Created",
@@ -132,11 +199,14 @@ export default function QRCodesNew() {
         description: error.message || "There was an error creating your QR code. Please try again.",
         variant: "destructive",
       });
-      submittingRef.current = false;
     } finally {
       setIsLoading(false);
+      console.log("Submission complete, isLoading set to false");
+      
+      // Reset submission ref after a short delay
       setTimeout(() => {
         submittingRef.current = false;
+        console.log("Reset submittingRef to false");
       }, 500);
     }
   };
