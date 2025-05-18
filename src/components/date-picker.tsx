@@ -15,9 +15,10 @@ interface DatePickerProps {
   date: Date | null;
   setDate: (date: Date | null) => void;
   className?: string;
+  disabled?: boolean; // Added disabled prop
 }
 
-export function DatePicker({ date, setDate, className }: DatePickerProps) {
+export function DatePicker({ date, setDate, className, disabled }: DatePickerProps) {
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -28,6 +29,7 @@ export function DatePicker({ date, setDate, className }: DatePickerProps) {
             !date && "text-muted-foreground",
             className
           )}
+          disabled={disabled} // Use disabled prop
         >
           <CalendarIcon className="mr-2 h-4 w-4" />
           {date ? format(date, "PPP") : <span>Pick a date</span>}
@@ -39,6 +41,7 @@ export function DatePicker({ date, setDate, className }: DatePickerProps) {
           selected={date || undefined}
           onSelect={setDate}
           initialFocus
+          className={cn("p-3 pointer-events-auto")} // Added pointer-events-auto to ensure calendar is interactive
         />
       </PopoverContent>
     </Popover>

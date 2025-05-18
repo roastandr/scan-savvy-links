@@ -8,7 +8,7 @@ export const handleDeleteQRCode = async (
   qrCodes: QRCodeData[], 
   setQrCodes: React.Dispatch<React.SetStateAction<QRCodeData[]>>,
   toast: (props: ToastProps) => void
-) => {
+): Promise<void> => {
   try {
     const { error } = await supabase
       .from('qr_links')
@@ -38,7 +38,7 @@ export const handleToggleActive = async (
   qrCodes: QRCodeData[], 
   setQrCodes: React.Dispatch<React.SetStateAction<QRCodeData[]>>,
   toast: (props: ToastProps) => void
-) => {
+): Promise<void> => {
   try {
     const { error } = await supabase
       .from('qr_links')

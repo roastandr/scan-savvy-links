@@ -116,14 +116,16 @@ export const useDashboardData = (user: any, toast: (props: ToastProps) => void) 
     };
   }, [fetchDashboardData]);
 
-  const deleteQRCode = useCallback(async (id: string) => {
-    if (!isMounted.current) return false;
-    return handleDeleteQRCode(id, qrCodes, setQrCodes, toast);
+  // Update deleteQRCode to return void instead of boolean|void
+  const deleteQRCode = useCallback(async (id: string): Promise<void> => {
+    if (!isMounted.current) return;
+    await handleDeleteQRCode(id, qrCodes, setQrCodes, toast);
   }, [qrCodes, toast]);
 
-  const toggleActive = useCallback(async (id: string, active: boolean) => {
-    if (!isMounted.current) return false;
-    return handleToggleActive(id, active, qrCodes, setQrCodes, toast);
+  // Update toggleActive to return void instead of boolean|void
+  const toggleActive = useCallback(async (id: string, active: boolean): Promise<void> => {
+    if (!isMounted.current) return;
+    await handleToggleActive(id, active, qrCodes, setQrCodes, toast);
   }, [qrCodes, toast]);
 
   // Function to manually retry data fetching

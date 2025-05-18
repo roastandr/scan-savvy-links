@@ -1,3 +1,4 @@
+
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useDashboardData } from "@/hooks/useDashboardData";
@@ -29,6 +30,15 @@ export default function Dashboard() {
     retryFetchData
   } = useDashboardData(user, toast);
 
+  // Use separate handler functions with the correct return type
+  const deleteQRCode = async (id: string): Promise<void> => {
+    await handleDeleteQRCode(id);
+  };
+
+  const toggleActive = async (id: string, active: boolean): Promise<void> => {
+    await handleToggleActive(id, active);
+  };
+
   if (isLoading) {
     return <DashboardSkeleton />;
   }
@@ -56,7 +66,7 @@ export default function Dashboard() {
 
         <StatsCards stats={stats} />
         <ScanChart data={scanData} />
-        <QRCodesList qrCodes={qrCodes} onDelete={handleDeleteQRCode} onToggleActive={handleToggleActive} />
+        <QRCodesList qrCodes={qrCodes} onDelete={deleteQRCode} onToggleActive={toggleActive} />
         <DetailedMetrics browserData={browserData} osData={osData} deviceData={deviceData} locationData={locationData} />
       </div>
     );
@@ -71,7 +81,7 @@ export default function Dashboard() {
         <div>
           <h2 className="text-xl font-bold mb-4">Recent QR Codes</h2>
           {qrCodes.length > 0 ? (
-            <QRCodesList qrCodes={qrCodes} onDelete={handleDeleteQRCode} onToggleActive={handleToggleActive} />
+            <QRCodesList qrCodes={qrCodes} onDelete={deleteQRCode} onToggleActive={toggleActive} />
           ) : (
             <EmptyQRCodeState />
           )}
