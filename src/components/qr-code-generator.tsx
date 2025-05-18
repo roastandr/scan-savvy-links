@@ -36,7 +36,7 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
   const [trackingUrl, setTrackingUrl] = useState("");
   const { toast } = useToast();
   const formSubmittedRef = useRef(false);
-  const saveButtonRef = useRef<HTMLButtonElement>(null);
+  const submitAttemptedRef = useRef(false);
   
   // Generate the tracking URL whenever the shortCode changes
   useEffect(() => {
@@ -44,11 +44,12 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
     setTrackingUrl(`${origin}/r/${shortCode}`);
   }, [shortCode]);
   
-  // Reset formSubmittedRef when isLoading changes to false
+  // Clear form submitted ref when isLoading changes
   useEffect(() => {
     if (!isLoading && formSubmittedRef.current) {
       setTimeout(() => {
         formSubmittedRef.current = false;
+        console.log("Form submitted ref reset to false");
       }, 500);
     }
   }, [isLoading]);
@@ -68,12 +69,55 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
         expiresAt: "Expiration date cannot be in the past"
       });
     }
+    
+    // Validate form if submission was attempted
+    if (submitAttemptedRef.current) {
+      validateForm();
+    }
+  };
+
+  const clearError = (field: string) => {
+    if (errors[field]) {
+      const newErrors = { ...errors };
+      delete newErrors[field];
+      setErrors(newErrors);
+    }
+  };
+
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setName(e.target.value);
+    if (e.target.value.trim()) {
+      clearError('name');
+    }
+    if (submitAttemptedRef.current) {
+      validateForm();
+    }
+  };
+
+  const handleTargetUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setTargetUrl(e.target.value);
+    if (e.target.value.trim()) {
+      clearError('targetUrl');
+    }
+    if (submitAttemptedRef.current) {
+      validateForm();
+    }
+  };
+
+  const handleShortCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setShortCode(e.target.value);
+    if (e.target.value.trim()) {
+      clearError('shortCode');
+    }
+    if (submitAttemptedRef.current) {
+      validateForm();
+    }
   };
 
   const validateForm = () => {
-    // Prevent duplicate form submissions
+    // Prevent validation if already loading or form has been submitted
     if (formSubmittedRef.current || isLoading) {
-      console.log("Form submission prevented - already submitting or loading");
+      console.log("Form validation prevented - already submitting or loading");
       return false;
     }
     
@@ -85,7 +129,7 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
       newErrors.targetUrl = "Target URL is required";
     } else {
       try {
-        // Ensure URL has protocol
+        // Ensure URL has protocol for validation
         const urlToCheck = targetUrl.match(/^https?:\/\//i) ? targetUrl : `https://${targetUrl}`;
         new URL(urlToCheck);
       } catch (error) {
@@ -107,17 +151,22 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
     }
     
     setErrors(newErrors);
-    const isValid = Object.keys(newErrors).length === 0;
-    console.log("Form validation result:", isValid ? "Valid" : "Invalid", newErrors);
-    return isValid;
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Mark that submission was attempted for validation on future input changes
+    submitAttemptedRef.current = true;
+    
     console.log("Form submitted, validating...");
     
-    // Set the form as submitted to prevent duplicate submissions
-    formSubmittedRef.current = true;
+    // Prevent duplicate submissions
+    if (formSubmittedRef.current || isLoading) {
+      console.log("Form submission prevented - already submitting or loading");
+      return;
+    }
     
     // Ensure URL has protocol
     let processedUrl = targetUrl;
@@ -127,6 +176,9 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
     }
     
     if (validateForm()) {
+      // Set the form as submitted to prevent duplicate submissions
+      formSubmittedRef.current = true;
+      
       console.log("Form valid, calling onSave with data:", {
         name,
         targetUrl: processedUrl,
@@ -143,9 +195,7 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
         bgColor,
       });
     } else {
-      // Reset form submitted state if validation fails
       console.log("Form validation failed, resetting submission state");
-      formSubmittedRef.current = false;
       
       // Show toast for validation errors
       toast({
@@ -158,6 +208,7 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
 
   const generateNewCode = () => {
     setShortCode(generateShortCode());
+    clearError('shortCode');
   };
   
   const copyTrackingUrl = () => {
@@ -185,7 +236,7 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
               id="name"
               placeholder="My QR Code"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={handleNameChange}
               className={errors.name ? "border-destructive" : ""}
               disabled={isLoading}
             />
@@ -200,7 +251,7 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
                 id="targetUrl"
                 placeholder="example.com"
                 value={targetUrl}
-                onChange={(e) => setTargetUrl(e.target.value)}
+                onChange={handleTargetUrlChange}
                 className={`${errors.targetUrl ? "border-destructive" : ""} border-none px-0`}
                 disabled={isLoading}
               />
@@ -218,7 +269,7 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
                 id="shortCode"
                 placeholder="Short code"
                 value={shortCode}
-                onChange={(e) => setShortCode(e.target.value)}
+                onChange={handleShortCodeChange}
                 className={errors.shortCode ? "border-destructive" : ""}
                 disabled={isLoading}
               />
@@ -309,17 +360,9 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
           </div>
           
           <Button 
-            ref={saveButtonRef}
             type="submit" 
             className="w-full" 
             disabled={isLoading}
-            onClick={() => {
-              console.log("Save button clicked");
-              if (saveButtonRef.current) {
-                const form = saveButtonRef.current.closest('form');
-                if (form) form.requestSubmit();
-              }
-            }}
           >
             {isLoading ? "Saving..." : "Save QR Code"}
           </Button>

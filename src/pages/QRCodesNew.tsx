@@ -88,77 +88,57 @@ export default function QRCodesNew() {
       return;
     }
     
-    // Ensure we have a name
-    if (!qrCodeData.name.trim()) {
-      toast({
-        title: "Name required",
-        description: "Please provide a name for your QR code",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Ensure we have a target URL
-    if (!qrCodeData.targetUrl.trim()) {
-      toast({
-        title: "Target URL required",
-        description: "Please provide a target URL for your QR code",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Ensure we have a short code
-    if (!qrCodeData.shortCode.trim()) {
-      toast({
-        title: "Short code required",
-        description: "Please provide a short code for your QR code",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    console.log("Checking for duplicate name:", qrCodeData.name);
-    
-    // Check if name already exists before proceeding
-    const isDuplicate = await checkDuplicateName(qrCodeData.name);
-    if (isDuplicate) {
-      toast({
-        title: "Duplicate name",
-        description: "A QR code with this name already exists. Please choose a different name.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    console.log("Checking for duplicate short code:", qrCodeData.shortCode);
-    
-    // Check if short code already exists
-    const isDuplicateShortCode = await checkDuplicateShortCode(qrCodeData.shortCode);
-    if (isDuplicateShortCode) {
-      toast({
-        title: "Duplicate short code",
-        description: "This short code is already in use. Please generate a new one.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
+    // Set the submission flag to prevent duplicates
     submittingRef.current = true;
-    setIsLoading(true);
-    console.log("Starting submission, isLoading set to true");
-
+    
     try {
-      // Validate the URL format
-      try {
-        new URL(qrCodeData.targetUrl);
-      } catch (err) {
-        throw new Error("Please enter a valid URL including http:// or https://");
+      // Validate required fields before proceeding
+      if (!qrCodeData.name.trim()) {
+        throw new Error("Please provide a name for your QR code");
       }
       
-      // Validate expiration date is not in the past
+      if (!qrCodeData.targetUrl.trim()) {
+        throw new Error("Please provide a target URL for your QR code");
+      }
+      
+      if (!qrCodeData.shortCode.trim()) {
+        throw new Error("Please provide a short code for your QR code");
+      }
+      
       if (qrCodeData.expiresAt && qrCodeData.expiresAt < new Date()) {
         throw new Error("Expiration date cannot be in the past");
+      }
+      
+      console.log("Checking for duplicate name:", qrCodeData.name);
+      
+      // Check if name already exists before proceeding
+      const isDuplicate = await checkDuplicateName(qrCodeData.name);
+      if (isDuplicate) {
+        throw new Error("A QR code with this name already exists. Please choose a different name.");
+      }
+      
+      console.log("Checking for duplicate short code:", qrCodeData.shortCode);
+      
+      // Check if short code already exists
+      const isDuplicateShortCode = await checkDuplicateShortCode(qrCodeData.shortCode);
+      if (isDuplicateShortCode) {
+        throw new Error("This short code is already in use. Please generate a new one.");
+      }
+      
+      // Start showing loading state after validations pass
+      setIsLoading(true);
+      console.log("Starting submission, isLoading set to true");
+
+      // Validate the URL format
+      let processedUrl = qrCodeData.targetUrl;
+      if (!processedUrl.match(/^https?:\/\//i)) {
+        processedUrl = `https://${processedUrl}`;
+      }
+      
+      try {
+        new URL(processedUrl);
+      } catch (err) {
+        throw new Error("Please enter a valid URL including http:// or https://");
       }
       
       console.log("Saving QR code to database");
@@ -168,7 +148,7 @@ export default function QRCodesNew() {
         .from('qr_links')
         .insert({
           name: qrCodeData.name,
-          target_url: qrCodeData.targetUrl,
+          target_url: processedUrl,
           slug: qrCodeData.shortCode,
           expires_at: qrCodeData.expiresAt ? qrCodeData.expiresAt.toISOString() : null,
           color: qrCodeData.fgColor,
@@ -181,7 +161,7 @@ export default function QRCodesNew() {
       
       if (error) {
         console.error("Database error:", error);
-        throw error;
+        throw new Error(error.message || "Error saving QR code");
       }
       
       console.log("QR code created successfully, id:", data.id);
