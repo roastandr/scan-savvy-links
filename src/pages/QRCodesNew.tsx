@@ -9,9 +9,38 @@ import { Loader2 } from "lucide-react";
 
 export default function QRCodesNew() {
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
+
+  // Function to check if a QR code with the same name already exists
+  const checkDuplicateName = async (name: string): Promise<boolean> => {
+    if (!user) return false;
+    
+    setIsCheckingDuplicate(true);
+    try {
+      const { data, error } = await supabase
+        .from('qr_links')
+        .select('id')
+        .eq('name', name)
+        .eq('user_id', user.id);
+      
+      setIsCheckingDuplicate(false);
+      
+      if (error) {
+        console.error("Error checking duplicate name:", error);
+        return false;
+      }
+      
+      // Return true if duplicates were found
+      return data && data.length > 0;
+    } catch (error) {
+      setIsCheckingDuplicate(false);
+      console.error("Error checking duplicate name:", error);
+      return false;
+    }
+  };
 
   const handleSaveQRCode = async (qrCodeData: {
     name: string;
@@ -30,6 +59,17 @@ export default function QRCodesNew() {
       return;
     }
     
+    // Check if name already exists before proceeding
+    const isDuplicate = await checkDuplicateName(qrCodeData.name);
+    if (isDuplicate) {
+      toast({
+        title: "Duplicate name",
+        description: "A QR code with this name already exists. Please choose a different name.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsLoading(true);
 
     try {
@@ -43,18 +83,6 @@ export default function QRCodesNew() {
       // Validate expiration date is not in the past
       if (qrCodeData.expiresAt && qrCodeData.expiresAt < new Date()) {
         throw new Error("Expiration date cannot be in the past");
-      }
-      
-      // Check for duplicate QR code name
-      const { data: existingQR, error: checkError } = await supabase
-        .from('qr_links')
-        .select('id')
-        .eq('name', qrCodeData.name)
-        .eq('user_id', user.id)
-        .single();
-      
-      if (!checkError && existingQR) {
-        throw new Error("A QR code with this name already exists. Please choose a different name.");
       }
       
       // Check for duplicate shortCode
@@ -122,7 +150,10 @@ export default function QRCodesNew() {
         </div>
       )}
 
-      <QRCodeGenerator onSave={handleSaveQRCode} isLoading={isLoading} />
+      <QRCodeGenerator 
+        onSave={handleSaveQRCode} 
+        isLoading={isLoading || isCheckingDuplicate} 
+      />
     </div>
   );
 }

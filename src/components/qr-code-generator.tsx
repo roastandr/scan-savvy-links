@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +36,7 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [trackingUrl, setTrackingUrl] = useState("");
   const { toast } = useToast();
+  const formSubmittedRef = useRef(false);
   
   // Generate the tracking URL whenever the shortCode changes
   useEffect(() => {
@@ -43,7 +44,29 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
     setTrackingUrl(`${origin}/r/${shortCode}`);
   }, [shortCode]);
   
+  // Handle expiration date changes and validate it's not in the past
+  const handleExpirationDateChange = (date: Date | null) => {
+    setExpiresAt(date);
+    
+    // Clear any existing expiration error if the date is valid or null
+    if (!date || date > new Date()) {
+      const newErrors = {...errors};
+      delete newErrors.expiresAt;
+      setErrors(newErrors);
+    } else if (date < new Date()) {
+      setErrors({
+        ...errors,
+        expiresAt: "Expiration date cannot be in the past"
+      });
+    }
+  };
+
   const validateForm = () => {
+    // Prevent duplicate form submissions
+    if (formSubmittedRef.current) {
+      return false;
+    }
+    
     const newErrors: Record<string, string> = {};
     
     if (!name.trim()) newErrors.name = "Name is required";
@@ -80,6 +103,9 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Set the form as submitted to prevent duplicate submissions
+    formSubmittedRef.current = true;
+    
     // Ensure URL has protocol
     let processedUrl = targetUrl;
     if (processedUrl && !processedUrl.match(/^https?:\/\//i)) {
@@ -96,6 +122,9 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
         fgColor,
         bgColor,
       });
+    } else {
+      // Reset form submitted state if validation fails
+      formSubmittedRef.current = false;
     }
   };
 
@@ -209,7 +238,7 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
             <Label>Expiration Date (Optional)</Label>
             <DatePicker
               date={expiresAt}
-              setDate={setExpiresAt}
+              setDate={handleExpirationDateChange}
               className="w-full"
               disabled={isLoading}
             />
