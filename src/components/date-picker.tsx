@@ -1,5 +1,4 @@
 
-import { useState } from "react";
 import { format } from "date-fns";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -15,7 +14,7 @@ interface DatePickerProps {
   date: Date | null;
   setDate: (date: Date | null) => void;
   className?: string;
-  disabled?: boolean; // Added disabled prop
+  disabled?: boolean;
 }
 
 export function DatePicker({ date, setDate, className, disabled }: DatePickerProps) {
@@ -29,7 +28,7 @@ export function DatePicker({ date, setDate, className, disabled }: DatePickerPro
             !date && "text-muted-foreground",
             className
           )}
-          disabled={disabled} // Use disabled prop
+          disabled={disabled}
         >
           <CalendarIcon className="mr-2 h-4 w-4" />
           {date ? format(date, "PPP") : <span>Pick a date</span>}
@@ -41,7 +40,8 @@ export function DatePicker({ date, setDate, className, disabled }: DatePickerPro
           selected={date || undefined}
           onSelect={setDate}
           initialFocus
-          className={cn("p-3 pointer-events-auto")} // Added pointer-events-auto to ensure calendar is interactive
+          disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+          className={cn("p-3 pointer-events-auto")}
         />
       </PopoverContent>
     </Popover>

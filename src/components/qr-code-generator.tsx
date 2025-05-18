@@ -4,10 +4,9 @@ import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DatePicker } from "@/components/date-picker";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { HexColorPicker } from "react-colorful";
 import { generateShortCode } from "@/lib/utils";
 import { CalendarIcon, Copy, Link, RefreshCw } from "lucide-react";
@@ -63,7 +62,7 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
 
   const validateForm = () => {
     // Prevent duplicate form submissions
-    if (formSubmittedRef.current) {
+    if (formSubmittedRef.current || isLoading) {
       return false;
     }
     

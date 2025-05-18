@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { QRCodeGenerator } from "@/components/qr-code-generator";
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +13,7 @@ export default function QRCodesNew() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
+  const submittingRef = useRef(false);
 
   // Function to check if a QR code with the same name already exists
   const checkDuplicateName = async (name: string): Promise<boolean> => {
@@ -50,6 +51,10 @@ export default function QRCodesNew() {
     fgColor: string;
     bgColor: string;
   }) => {
+    if (submittingRef.current) {
+      return; // Prevent duplicate submissions
+    }
+    
     if (!user) {
       toast({
         title: "Authentication required",
@@ -70,6 +75,7 @@ export default function QRCodesNew() {
       return;
     }
     
+    submittingRef.current = true;
     setIsLoading(true);
 
     try {
@@ -89,10 +95,9 @@ export default function QRCodesNew() {
       const { data: existingShortCode, error: shortCodeError } = await supabase
         .from('qr_links')
         .select('id')
-        .eq('slug', qrCodeData.shortCode)
-        .single();
+        .eq('slug', qrCodeData.shortCode);
       
-      if (!shortCodeError && existingShortCode) {
+      if (!shortCodeError && existingShortCode && existingShortCode.length > 0) {
         throw new Error("This short code is already in use. Please generate a new one.");
       }
 
@@ -127,8 +132,12 @@ export default function QRCodesNew() {
         description: error.message || "There was an error creating your QR code. Please try again.",
         variant: "destructive",
       });
+      submittingRef.current = false;
     } finally {
       setIsLoading(false);
+      setTimeout(() => {
+        submittingRef.current = false;
+      }, 500);
     }
   };
 
