@@ -34,17 +34,26 @@ type QRCardProps = {
 
 export function QRCard({ qrCode, onDelete, onToggleActive }: QRCardProps) {
   const [isActive, setIsActive] = useState(qrCode.active);
+  const [isToggling, setIsToggling] = useState(false);
   
-  const handleToggleActive = () => {
+  const handleToggleActive = async () => {
     const newState = !isActive;
+    setIsToggling(true);
     setIsActive(newState);
-    onToggleActive(qrCode.id, newState);
+    await onToggleActive(qrCode.id, newState);
+    setIsToggling(false);
   };
 
-  // Ensure URL has proper format for display
+  // Ensure URL has proper format for display and linking
   const displayUrl = qrCode.targetUrl && !qrCode.targetUrl.match(/^https?:\/\//i) 
     ? `https://${qrCode.targetUrl}`
     : qrCode.targetUrl;
+
+  // Check if QR code is expired
+  const isExpired = qrCode.expiresAt && new Date(qrCode.expiresAt) < new Date();
+  
+  // Determine if QR code is truly active (not expired and marked as active)
+  const isTrulyActive = isActive && !isExpired;
 
   return (
     <Card className="overflow-hidden transition-all hover:shadow-md">
@@ -62,13 +71,13 @@ export function QRCard({ qrCode, onDelete, onToggleActive }: QRCardProps) {
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
-            {isActive ? (
+            {isTrulyActive ? (
               <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-200">
                 <Check className="h-3 w-3 mr-1" /> Active
               </Badge>
             ) : (
               <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-200">
-                <XCircle className="h-3 w-3 mr-1" /> Inactive
+                <XCircle className="h-3 w-3 mr-1" /> {isExpired ? "Expired" : "Inactive"}
               </Badge>
             )}
           </div>
@@ -82,8 +91,8 @@ export function QRCard({ qrCode, onDelete, onToggleActive }: QRCardProps) {
               <span>Created {formatDate(qrCode.createdAt)}</span>
             </div>
             {qrCode.expiresAt && (
-              <div className="text-xs text-muted-foreground">
-                Expires: {formatDate(qrCode.expiresAt)}
+              <div className={`text-xs ${isExpired ? "text-destructive" : "text-muted-foreground"}`}>
+                {isExpired ? "Expired: " : "Expires: "}{formatDate(qrCode.expiresAt)}
               </div>
             )}
           </div>
@@ -100,7 +109,11 @@ export function QRCard({ qrCode, onDelete, onToggleActive }: QRCardProps) {
         <div className="flex justify-between items-center w-full">
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Active</span>
-            <Switch checked={isActive} onCheckedChange={handleToggleActive} />
+            <Switch 
+              checked={isActive} 
+              onCheckedChange={handleToggleActive} 
+              disabled={isToggling || isExpired} 
+            />
           </div>
 
           <div className="flex gap-2">

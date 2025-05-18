@@ -10,7 +10,7 @@ import { DatePicker } from "@/components/date-picker";
 import { Card, CardContent } from "@/components/ui/card";
 import { HexColorPicker } from "react-colorful";
 import { generateShortCode } from "@/lib/utils";
-import { CalendarIcon, Copy, Link } from "lucide-react";
+import { CalendarIcon, Copy, Link, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -53,16 +53,25 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
     } else {
       try {
         // Ensure URL has protocol
-        if (!targetUrl.match(/^https?:\/\//i)) {
-          setTargetUrl(`https://${targetUrl}`);
-        }
-        new URL(targetUrl.match(/^https?:\/\//i) ? targetUrl : `https://${targetUrl}`);
+        const urlToCheck = targetUrl.match(/^https?:\/\//i) ? targetUrl : `https://${targetUrl}`;
+        new URL(urlToCheck);
       } catch (error) {
         newErrors.targetUrl = "Please enter a valid URL";
       }
     }
     
-    if (!shortCode.trim()) newErrors.shortCode = "Short code is required";
+    if (!shortCode.trim()) {
+      newErrors.shortCode = "Short code is required";
+    } else if (shortCode.length < 3) {
+      newErrors.shortCode = "Short code must be at least 3 characters";
+    } else if (!/^[a-zA-Z0-9_-]+$/.test(shortCode)) {
+      newErrors.shortCode = "Short code can only contain letters, numbers, underscores and hyphens";
+    }
+    
+    // Validate that expiration date is not in the past
+    if (expiresAt && expiresAt < new Date()) {
+      newErrors.expiresAt = "Expiration date cannot be in the past";
+    }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -121,6 +130,7 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
               value={name}
               onChange={(e) => setName(e.target.value)}
               className={errors.name ? "border-destructive" : ""}
+              disabled={isLoading}
             />
             {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
           </div>
@@ -135,6 +145,7 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
                 value={targetUrl}
                 onChange={(e) => setTargetUrl(e.target.value)}
                 className={`${errors.targetUrl ? "border-destructive" : ""} border-none px-0`}
+                disabled={isLoading}
               />
             </div>
             <p className="text-xs text-muted-foreground">
@@ -152,15 +163,21 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
                 value={shortCode}
                 onChange={(e) => setShortCode(e.target.value)}
                 className={errors.shortCode ? "border-destructive" : ""}
+                disabled={isLoading}
               />
               <Button
                 type="button"
                 variant="secondary"
                 onClick={generateNewCode}
+                disabled={isLoading}
               >
-                Refresh
+                <RefreshCw className="h-4 w-4 mr-2" />
+                New
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground">
+              This will be part of your QR code URL. Only letters, numbers, underscores and hyphens.
+            </p>
             {errors.shortCode && <p className="text-xs text-destructive">{errors.shortCode}</p>}
           </div>
           
@@ -178,6 +195,7 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
                 variant="outline"
                 onClick={copyTrackingUrl}
                 title="Copy to clipboard"
+                disabled={isLoading}
               >
                 <Copy className="h-4 w-4" />
               </Button>
@@ -193,7 +211,12 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
               date={expiresAt}
               setDate={setExpiresAt}
               className="w-full"
+              disabled={isLoading}
             />
+            {errors.expiresAt && <p className="text-xs text-destructive">{errors.expiresAt}</p>}
+            <p className="text-xs text-muted-foreground">
+              When set, the QR code will stop working after this date.
+            </p>
           </div>
           
           <div className="space-y-4">
@@ -211,6 +234,7 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
                   value={fgColor}
                   onChange={(e) => setFgColor(e.target.value)}
                   className="mt-2"
+                  disabled={isLoading}
                 />
               </TabsContent>
               <TabsContent value="background" className="space-y-2 mt-2">
@@ -221,6 +245,7 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
                   value={bgColor}
                   onChange={(e) => setBgColor(e.target.value)}
                   className="mt-2"
+                  disabled={isLoading}
                 />
               </TabsContent>
             </Tabs>
@@ -251,7 +276,11 @@ export function QRCodeGenerator({ onSave, isLoading = false }: QRCodeGeneratorPr
           {expiresAt && (
             <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
               <CalendarIcon className="h-3 w-3" />
-              Expires {format(expiresAt, "PPP")}
+              {expiresAt < new Date() ? (
+                <span className="text-destructive">Expired {format(expiresAt, "PPP")}</span>
+              ) : (
+                <span>Expires {format(expiresAt, "PPP")}</span>
+              )}
             </p>
           )}
         </div>

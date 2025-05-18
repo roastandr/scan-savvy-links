@@ -52,9 +52,11 @@ export const useDashboardData = (user: any, toast: (props: ToastProps) => void) 
   const isFetchingRef = useRef(false);
   // Use a ref to track if we've already fetched data
   const dataFetchedRef = useRef(false);
+  // Track component mounted state
+  const isMounted = useRef(true);
 
   const fetchDashboardData = useCallback(async () => {
-    if (!user || isFetchingRef.current) return;
+    if (!user || isFetchingRef.current || !isMounted.current) return;
     
     // Set the fetching flag to prevent multiple concurrent fetches
     isFetchingRef.current = true;
@@ -62,30 +64,39 @@ export const useDashboardData = (user: any, toast: (props: ToastProps) => void) 
     setHasError(false);
     
     const handleError = (message: string) => {
-      toast({
-        title: "Failed to load dashboard data",
-        description: "Using demo data instead. " + message,
-        variant: "destructive",
-      });
+      if (isMounted.current) {
+        toast({
+          title: "Failed to load dashboard data",
+          description: "Using demo data instead. " + message,
+          variant: "destructive",
+        });
+      }
     };
     
     try {
       const result = await fetchAllDashboardData(user, handleError);
       
-      // Update state with fetched data
-      setQrCodes(result.qrCodes);
-      setScanData(result.scanData);
-      setLocationData(result.locationData);
-      setDeviceData(result.deviceData);
-      setBrowserData(result.browserData);
-      setOsData(result.osData);
-      setStats(calculateStats(result.qrCodes, result.scanData));
-      setHasError(result.hasError);
+      // Only update state if component is still mounted
+      if (isMounted.current) {
+        // Update state with fetched data
+        setQrCodes(result.qrCodes);
+        setScanData(result.scanData);
+        setLocationData(result.locationData);
+        setDeviceData(result.deviceData);
+        setBrowserData(result.browserData);
+        setOsData(result.osData);
+        setStats(calculateStats(result.qrCodes, result.scanData));
+        setHasError(result.hasError);
+      }
     } catch (error: any) {
       console.error("Unexpected error in dashboard data hook:", error);
-      setHasError(true);
+      if (isMounted.current) {
+        setHasError(true);
+      }
     } finally {
-      setIsLoading(false);
+      if (isMounted.current) {
+        setIsLoading(false);
+      }
       isFetchingRef.current = false;
     }
   }, [user, toast]);
@@ -98,23 +109,27 @@ export const useDashboardData = (user: any, toast: (props: ToastProps) => void) 
       dataFetchedRef.current = true;
     }
     
+    // Cleanup function to prevent state updates after unmount
     return () => {
-      // Reset the fetching flag if component unmounts during fetch
+      isMounted.current = false;
       isFetchingRef.current = false;
     };
   }, [fetchDashboardData]);
 
   const deleteQRCode = useCallback(async (id: string) => {
+    if (!isMounted.current) return false;
     return handleDeleteQRCode(id, qrCodes, setQrCodes, toast);
   }, [qrCodes, toast]);
 
   const toggleActive = useCallback(async (id: string, active: boolean) => {
+    if (!isMounted.current) return false;
     return handleToggleActive(id, active, qrCodes, setQrCodes, toast);
   }, [qrCodes, toast]);
 
   // Function to manually retry data fetching
   const retryFetchData = useCallback(() => {
     // Reset the dataFetched flag to allow a new fetch
+    if (!isMounted.current) return;
     dataFetchedRef.current = false;
     fetchDashboardData();
   }, [fetchDashboardData]);

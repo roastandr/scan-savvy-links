@@ -39,16 +39,34 @@ export default function QRCodesNew() {
       } catch (err) {
         throw new Error("Please enter a valid URL including http:// or https://");
       }
-
-      console.log("Saving QR code with data:", {
-        name: qrCodeData.name,
-        target_url: qrCodeData.targetUrl,
-        slug: qrCodeData.shortCode,
-        expires_at: qrCodeData.expiresAt,
-        color: qrCodeData.fgColor,
-        background_color: qrCodeData.bgColor,
-        user_id: user.id,
-      });
+      
+      // Validate expiration date is not in the past
+      if (qrCodeData.expiresAt && qrCodeData.expiresAt < new Date()) {
+        throw new Error("Expiration date cannot be in the past");
+      }
+      
+      // Check for duplicate QR code name
+      const { data: existingQR, error: checkError } = await supabase
+        .from('qr_links')
+        .select('id')
+        .eq('name', qrCodeData.name)
+        .eq('user_id', user.id)
+        .single();
+      
+      if (!checkError && existingQR) {
+        throw new Error("A QR code with this name already exists. Please choose a different name.");
+      }
+      
+      // Check for duplicate shortCode
+      const { data: existingShortCode, error: shortCodeError } = await supabase
+        .from('qr_links')
+        .select('id')
+        .eq('slug', qrCodeData.shortCode)
+        .single();
+      
+      if (!shortCodeError && existingShortCode) {
+        throw new Error("This short code is already in use. Please generate a new one.");
+      }
 
       // Save QR code to database
       const { data, error } = await supabase

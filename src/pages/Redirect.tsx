@@ -1,204 +1,162 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
-import { Loader2, Link, AlertCircle } from "lucide-react";
-import { Logo } from "@/components/logo";
 import { supabase } from "@/integrations/supabase/client";
+import { Loader2 } from "lucide-react";
 
 export default function Redirect() {
-  const { shortCode } = useParams();
-  const [status, setStatus] = useState<"loading" | "notFound" | "redirecting">("loading");
-  const [targetUrl, setTargetUrl] = useState<string | null>(null);
+  const { shortCode } = useParams<{ shortCode: string }>();
   const [error, setError] = useState<string | null>(null);
-  // Use ref to track if we already processed the lookup
-  const lookupProcessedRef = useRef(false);
+  const redirectAttempted = useRef(false);
   
   useEffect(() => {
-    // Prevent multiple lookups for the same short code
-    if (lookupProcessedRef.current) return;
+    // Prevent multiple redirect attempts
+    if (redirectAttempted.current) return;
+    redirectAttempted.current = true;
     
-    const lookupShortCode = async () => {
-      if (!shortCode) {
-        setStatus("notFound");
-        return;
-      }
-
+    const fetchQRLink = async () => {
       try {
-        // Mark lookup as processed to prevent recursive calls
-        lookupProcessedRef.current = true;
-        
-        console.log("Looking up short code:", shortCode);
-        
-        // Get QR link info from database
-        const { data: qrLink, error } = await supabase
-          .from('qr_links')
-          .select('id, target_url, is_active, expires_at')
-          .eq('slug', shortCode)
-          .single();
-        
-        if (error) {
-          console.error("Error looking up short code:", error);
-          setStatus("notFound");
-          setError(`Database error: ${error.message}`);
+        if (!shortCode) {
+          setError("Invalid QR code link");
           return;
         }
-
-        if (!qrLink) {
-          console.error("QR link not found for shortcode:", shortCode);
-          setStatus("notFound");
-          setError("QR code not found in database");
+        
+        // Use the get_qr_link_by_slug function to get the QR link details
+        const { data, error: fetchError } = await supabase
+          .rpc('get_qr_link_by_slug', { slug_param: shortCode });
+        
+        if (fetchError) throw fetchError;
+        
+        if (!data || data.length === 0) {
+          setError("QR code not found");
           return;
         }
-
-        console.log("QR link found:", qrLink);
-
-        // Check if QR code is active and not expired
+        
+        const qrLink = data[0];
+        
+        // Check if the QR code is active
         if (!qrLink.is_active) {
-          setStatus("notFound");
-          setError("This QR code has been deactivated");
+          setError("This QR code is inactive");
           return;
         }
-
+        
+        // Check if the QR code has expired
         if (qrLink.expires_at && new Date(qrLink.expires_at) < new Date()) {
-          setStatus("notFound");
           setError("This QR code has expired");
           return;
         }
-
-        // Ensure target URL has a protocol
-        let finalTargetUrl = qrLink.target_url;
-        if (finalTargetUrl && !finalTargetUrl.match(/^https?:\/\//i)) {
-          finalTargetUrl = `https://${finalTargetUrl}`;
-        }
-
-        setTargetUrl(finalTargetUrl);
-
-        // Collect browser and device info
-        const userAgent = navigator.userAgent;
-        const deviceType = /mobile|tablet|ipad/i.test(userAgent) ? "mobile" : "desktop";
-        const browser = detectBrowser(userAgent);
-        const os = detectOS(userAgent);
-        const referrer = document.referrer;
-
-        console.log("Recording scan with data:", {
-          qr_link_id: qrLink.id,
-          device_type: deviceType,
-          browser: browser,
-          os: os,
-          referrer: referrer
+        
+        // Record the scan asynchronously - don't wait for it to complete
+        recordScan(qrLink.id).catch(err => {
+          console.error("Failed to record scan:", err);
         });
-
-        // Record the scan - run this in background without waiting
-        try {
-          // Use Promise to handle the async operation
-          supabase.rpc('record_scan', {
-            qr_link_id_param: qrLink.id,
-            device_type_param: deviceType,
-            browser_param: browser,
-            os_param: os,
-            referrer_param: referrer
-          }).then(({ error: scanError }) => {
-            if (scanError) {
-              console.error("Error recording scan:", scanError);
-            } else {
-              console.log("Scan recorded successfully");
-            }
-          });
-        } catch (recordError) {
-          // Just log the error, don't prevent redirect
-          console.error("Error in scan recording:", recordError);
+        
+        // Redirect to the target URL
+        let targetUrl = qrLink.target_url;
+        if (!targetUrl.match(/^https?:\/\//i)) {
+          targetUrl = `https://${targetUrl}`;
         }
         
-        // Wait a bit, then redirect
-        setStatus("redirecting");
-        setTimeout(() => {
-          if (finalTargetUrl) {
-            console.log("Redirecting to:", finalTargetUrl);
-            window.location.href = finalTargetUrl;
-          } else {
-            console.error("Target URL is null or empty");
-            setStatus("notFound");
-            setError("Invalid target URL");
-          }
-        }, 1500);
-      } catch (error: any) {
-        console.error("Error in redirect process:", error);
-        setStatus("notFound");
-        setError(`Unexpected error: ${error.message || "Unknown error"}`);
+        // Redirect the user to the target URL
+        window.location.href = targetUrl;
+      } catch (err) {
+        console.error("Error processing QR code:", err);
+        setError("An error occurred while processing this QR code");
       }
     };
     
-    lookupShortCode();
-    
-    return () => {
-      // Cleanup - mark as processed to prevent additional calls
-      lookupProcessedRef.current = true;
-    };
+    fetchQRLink();
   }, [shortCode]);
   
-  // Simple browser detection
-  const detectBrowser = (userAgent: string): string => {
-    if (userAgent.includes('Firefox')) return 'Firefox';
-    if (userAgent.includes('Chrome')) return 'Chrome';
-    if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) return 'Safari';
-    if (userAgent.includes('Edge')) return 'Edge';
-    if (userAgent.includes('MSIE') || userAgent.includes('Trident/')) return 'Internet Explorer';
-    return 'Other';
-  };
-
-  // Simple OS detection
-  const detectOS = (userAgent: string): string => {
-    if (userAgent.includes('Windows')) return 'Windows';
-    if (userAgent.includes('Mac')) return 'macOS';
-    if (userAgent.includes('Linux')) return 'Linux';
-    if (userAgent.includes('Android')) return 'Android';
-    if (userAgent.includes('iPhone') || userAgent.includes('iPad')) return 'iOS';
-    return 'Other';
+  // Function to record the scan with device and location information
+  const recordScan = async (qrLinkId: string) => {
+    try {
+      // Get browser and OS information from navigator
+      const browserInfo = getBrowserInfo();
+      const userAgent = navigator.userAgent;
+      
+      // Simplified device detection
+      const deviceType = /mobile|android|iphone|ipad|ipod/i.test(userAgent) 
+        ? "mobile" 
+        : /tablet|ipad/i.test(userAgent) 
+          ? "tablet" 
+          : "desktop";
+      
+      // Use Supabase Edge Function or RPC to record the scan
+      await supabase.rpc('record_scan', {
+        qr_link_id_param: qrLinkId,
+        browser_param: browserInfo.browser,
+        os_param: browserInfo.os,
+        device_type_param: deviceType,
+        referrer_param: document.referrer || null
+      });
+      
+    } catch (err) {
+      console.error("Error recording scan:", err);
+      // Don't throw here - we want the redirect to happen even if tracking fails
+    }
   };
   
+  // Function to get browser and OS information
+  const getBrowserInfo = () => {
+    const userAgent = navigator.userAgent;
+    let browser = "Unknown";
+    let os = "Unknown";
+    
+    // Browser detection
+    if (userAgent.indexOf("Firefox") > -1) {
+      browser = "Firefox";
+    } else if (userAgent.indexOf("SamsungBrowser") > -1) {
+      browser = "Samsung Browser";
+    } else if (userAgent.indexOf("Opera") > -1 || userAgent.indexOf("OPR") > -1) {
+      browser = "Opera";
+    } else if (userAgent.indexOf("Trident") > -1) {
+      browser = "Internet Explorer";
+    } else if (userAgent.indexOf("Edge") > -1) {
+      browser = "Edge";
+    } else if (userAgent.indexOf("Chrome") > -1) {
+      browser = "Chrome";
+    } else if (userAgent.indexOf("Safari") > -1) {
+      browser = "Safari";
+    }
+    
+    // OS detection
+    if (userAgent.indexOf("Win") > -1) {
+      os = "Windows";
+    } else if (userAgent.indexOf("Mac") > -1) {
+      os = "macOS";
+    } else if (userAgent.indexOf("Linux") > -1) {
+      os = "Linux";
+    } else if (userAgent.indexOf("Android") > -1) {
+      os = "Android";
+    } else if (userAgent.indexOf("like Mac") > -1) {
+      os = "iOS";
+    }
+    
+    return { browser, os };
+  };
+
   return (
-    <div className="flex flex-col min-h-screen items-center justify-center bg-gradient-to-b from-background to-muted px-4">
-      <div className="mb-8">
-        <Logo size="large" />
-      </div>
-      
-      <div className="w-full max-w-md text-center">
-        {status === "loading" && (
-          <div className="flex flex-col items-center gap-2">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-lg font-medium">Looking up your destination...</p>
-          </div>
-        )}
-        
-        {status === "redirecting" && (
-          <div className="flex flex-col items-center gap-2">
-            <div className="flex items-center gap-2">
-              <div className="h-2.5 w-2.5 rounded-full bg-primary animate-pulse"></div>
-              <div className="h-2.5 w-2.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: "0.2s" }}></div>
-              <div className="h-2.5 w-2.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: "0.4s" }}></div>
-            </div>
-            <p className="text-lg font-medium">Redirecting to your destination...</p>
-            <p className="text-sm text-muted-foreground mt-1 break-all">
-              {targetUrl}
-            </p>
-          </div>
-        )}
-        
-        {status === "notFound" && (
-          <div className="flex flex-col items-center gap-2">
-            <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center">
-              <AlertCircle className="h-6 w-6 text-red-600" />
-            </div>
-            <h1 className="text-xl font-bold mt-4">QR Code Error</h1>
-            <p className="text-muted-foreground">
-              {error || "The QR code you scanned doesn't exist, has expired, or has been deactivated."}
-            </p>
+    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-muted/30">
+      <div className="w-full max-w-md p-6 bg-white rounded-lg shadow-lg text-center">
+        {error ? (
+          <>
+            <h1 className="text-2xl font-bold text-destructive mb-4">QR Code Error</h1>
+            <p className="text-muted-foreground">{error}</p>
             <div className="mt-4">
-              <a href="/" className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2">
-                <Link className="h-4 w-4 mr-2" /> Return Home
+              <a 
+                href="/" 
+                className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 text-primary underline-offset-4 hover:underline"
+              >
+                Go to Homepage
               </a>
             </div>
-          </div>
+          </>
+        ) : (
+          <>
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+            <p className="mt-4 text-muted-foreground">Redirecting...</p>
+          </>
         )}
       </div>
     </div>
